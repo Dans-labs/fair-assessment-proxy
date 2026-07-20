@@ -1,6 +1,6 @@
 import logging
 
-from fair_assessment_proxy.api import root, assessments
+from fair_assessment_proxy.api import root, assessments, profiles, assessors
 from fair_assessment_proxy.config import (
     load_service_config,
     init_logging,
@@ -31,6 +31,10 @@ app = FastAPI(
 app.include_router(root.router, prefix=API_PREFIX)
 app.include_router(
     assessments.router, tags=["Assessments"], prefix=f"{API_PREFIX}/assessments"
+)
+app.include_router(profiles.router, tags=["Profiles"], prefix=f"{API_PREFIX}/profiles")
+app.include_router(
+    assessors.router, tags=["Assessors"], prefix=f"{API_PREFIX}/assessors"
 )
 
 
