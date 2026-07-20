@@ -2,6 +2,10 @@ import logging
 from dynaconf import Dynaconf
 from dataclasses import dataclass
 import tomllib
+from pathlib import Path
+from typing import Any
+
+import yaml
 
 settings = Dynaconf(
     envvar_prefix="TOOL_REGISTRY",
@@ -26,6 +30,33 @@ class ServiceConfig:
     bind_address: str = "0.0.0.0"
     api_prefix: str = "/api/v1"
     egi_env: str = "production"
+
+
+class AssessorConfigError(Exception):
+    pass
+
+
+def load_assessor_config(path: str = "config/assessors.yaml") -> dict[str, Any]:
+    config_path = Path(path)
+
+    if not config_path.exists():
+        raise AssessorConfigError(f"Config file not found: {config_path}")
+
+    with config_path.open("r", encoding="utf-8") as handle:
+        config = yaml.safe_load(handle)
+
+    if not config or "assessors" not in config:
+        raise AssessorConfigError("Missing top-level 'assessors' section")
+
+    return config["assessors"]
+
+
+def enabled_assessors(config: dict[str, Any]) -> dict[str, Any]:
+    return {
+        assessor_id: assessor
+        for assessor_id, assessor in config.items()
+        if assessor.get("enabled", False)
+    }
 
 
 def get_app_version() -> str:

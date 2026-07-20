@@ -10,6 +10,10 @@ from fair_assessment_proxy.config import (
 import fair_assessment_proxy.security as security
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
+from typing import Any
+from fair_assessment_proxy.models import AssessmentRequest
+from fair_assessment_proxy.plugin_loader import load_assessor_plugins
+from fair_assessment_proxy.plugins.base import AssessmentContext
 
 init_logging()
 logger = logging.getLogger(__name__)
@@ -20,6 +24,8 @@ logger.info("Starting FAIR assessment proxy")
 security.init_nonce_db()
 ADMIN_TOKEN = security.generate_admin_token(service_config.admin_auth_key)
 logger.info(f"Admin token: {ADMIN_TOKEN}")
+PLUGINS = load_assessor_plugins()
+ASSESSMENTS: dict[str, dict[str, Any]] = {}
 
 
 app = FastAPI(
