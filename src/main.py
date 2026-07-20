@@ -1,0 +1,43 @@
+import logging
+
+from fair_assessment_proxy.api import root, assessments
+from fair_assessment_proxy.config import (
+    load_service_config,
+    init_logging,
+    get_app_version,
+    load_db_config,
+)
+import fair_assessment_proxy.security as security
+from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
+
+init_logging()
+logger = logging.getLogger(__name__)
+service_config = load_service_config()
+API_PREFIX = service_config.api_prefix
+VERSION = get_app_version()
+logger.info("Starting FAIR assessment proxy")
+security.init_nonce_db()
+ADMIN_TOKEN = security.generate_admin_token(service_config.admin_auth_key)
+logger.info(f"Admin token: {ADMIN_TOKEN}")
+
+
+app = FastAPI(
+    # title=project_details["title"],
+    # description=project_details["description"],
+    # version=f"{project_details['version']} (Build Date: {build_date})",
+)
+
+app.include_router(root.router, prefix=API_PREFIX)
+app.include_router(
+    assessments.router, tags=["Assessments"], prefix=f"{API_PREFIX}/assessments"
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
