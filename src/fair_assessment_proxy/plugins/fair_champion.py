@@ -424,8 +424,15 @@ class FairChampionAssessor(AssessorPlugin):
 
             outcomes_by_principle[principle].append(outcome)
 
-        def outcome(principle: str) -> FairOutcome | None:
-            return combine_outcomes(outcomes_by_principle.get(principle, []))
+        # def outcome(principle: str) -> FairOutcome | None:
+        #     return combine_outcomes(outcomes_by_principle.get(principle, []))
+
+        def outcome(
+            principle: str,
+            default: FairOutcome = FairOutcome.not_applicable,
+        ) -> FairOutcome:
+            result = combine_outcomes(outcomes_by_principle.get(principle, []))
+            return default if result is None else result
 
         # Subprinciples
         f1 = outcome("f1")
