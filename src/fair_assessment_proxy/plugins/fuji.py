@@ -5,6 +5,7 @@ import httpx
 
 from fair_assessment_proxy.models import AssessmentMode, AssessorResult
 from fair_assessment_proxy.plugins.base import AssessmentContext, AssessorPlugin
+from fair_assessment_proxy.models import NormalizedAssessorResult, FairOutcome
 
 
 class FujiAssessor(AssessorPlugin):
@@ -17,10 +18,11 @@ class FujiAssessor(AssessorPlugin):
                 name=self.name,
                 status="completed",
                 raw=raw,
-                normalised=self._normalise(raw),
+                normalised=self.normalize(raw, context),
             )
 
         except Exception as exc:
+            print(f"[ERROR] F-UJI assessment failed for {context.pid}: {exc}")
             return AssessorResult(
                 assessor_id=self.assessor_id,
                 name=self.name,
@@ -80,7 +82,7 @@ class FujiAssessor(AssessorPlugin):
 
         return response.json()
 
-    def _normalise(self, raw: dict[str, Any]) -> dict[str, Any]:
+    def _normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         summary = raw.get("summary", {})
 
         score_earned = summary.get("score_earned", {})
@@ -106,3 +108,52 @@ class FujiAssessor(AssessorPlugin):
                 for principle in ["F", "A", "I", "R"]
             },
         }
+
+    def normalize(
+        self, raw: dict[str, Any], context: AssessmentContext
+    ) -> NormalizedAssessorResult:
+        score_percent = raw.get("summary", {}).get("score_percent", {})
+
+        def outcome_from_percent(value: float | int | None) -> FairOutcome:
+            if value is None:
+                return FairOutcome.indeterminate
+            if value == 100:
+                return FairOutcome.pass_
+            if value == 0:
+                return FairOutcome.fail
+            return FairOutcome.partial
+
+        def out(key: str) -> FairOutcome:
+            return outcome_from_percent(score_percent.get(key))
+
+        return NormalizedAssessorResult(
+            assessor="fuji",
+            profile="fuji",
+            status="completed",
+            overall=out("FAIR"),
+            f=out("F"),
+            a=out("A"),
+            i=out("I"),
+            r=out("R"),
+            f1=out("F1"),
+            f2=out("F2"),
+            f3=out("F3"),
+            f4=out("F4"),
+            a1=out("A1"),
+            a1_1=out("A1.1"),
+            a1_2=out("A1.2"),
+            a2=out("A2"),
+            i1=out("I1"),
+            i2=out("I2"),
+            i3=out("I3"),
+            r1=out("R1"),
+            r1_1=out("R1.1"),
+            r1_2=out("R1.2"),
+            r1_3=out("R1.3"),
+            extra={
+                "source": "fuji",
+                "metric_version": raw.get("metric_version"),
+                "software_version": raw.get("software_version"),
+                "resolved_url": raw.get("resolved_url"),
+            },
+        )

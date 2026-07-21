@@ -2,7 +2,9 @@ from typing import Any
 
 import httpx
 
+
 from fair_assessment_proxy.models import AssessmentMode, AssessorResult
+from fair_assessment_proxy.models import NormalizedAssessorResult, FairOutcome
 from fair_assessment_proxy.plugins.base import AssessmentContext, AssessorPlugin
 
 
@@ -25,7 +27,7 @@ class FairChampionAssessor(AssessorPlugin):
                 name=self.name,
                 status="completed",
                 raw=raw,
-                normalised=self._normalise(raw),
+                normalised=self._normalize(raw),
             )
 
         except Exception as exc:
@@ -105,7 +107,7 @@ class FairChampionAssessor(AssessorPlugin):
 
         return f"{gateway}/resource/doi/{doi}"
 
-    def _normalise(self, raw: dict[str, Any]) -> dict[str, Any]:
+    def _normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
         tests = raw.get("tests", [])
 
         total = len(tests)
@@ -160,3 +162,8 @@ class FairChampionAssessor(AssessorPlugin):
             return "fail"
 
         return "indeterminate"
+
+    def normalize(
+        self, raw: dict[str, Any], context: AssessmentContext
+    ) -> NormalizedAssessorResult:
+        raise NotImplementedError

@@ -2,7 +2,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from fair_assessment_proxy.models import AssessmentMode, AssessorResult
+from fair_assessment_proxy.models import (
+    AssessmentMode,
+    AssessorResult,
+    NormalizedAssessorResult,
+)
 
 
 @dataclass
@@ -25,6 +29,17 @@ class AssessorPlugin(ABC):
     async def assess(self, context: AssessmentContext) -> AssessorResult:
         """
         Run the assessment backend and return a standard result object.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def normalize(
+        self,
+        raw: dict[str, Any],
+        context: AssessmentContext,
+    ) -> NormalizedAssessorResult:
+        """
+        Convert backend-specific raw output into the shared canonical model.
         """
         raise NotImplementedError
 
