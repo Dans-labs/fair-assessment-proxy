@@ -12,7 +12,7 @@ assessors:
       metadata_service_type: "oai_pmh"
 
   fair_champion:
-    enabled: false
+    enabled: true
     class: "fair_assessment_proxy.plugins.fair_champion.FairChampionAssessor"
     name: "FAIR Champion"
     champion_base_url: "http://fair-champion:4567/champion"

@@ -3,7 +3,6 @@ name = "fair-assessment-proxy"
 version = "0.0.1"
 description = "A proxy service for the FAIR Assessment Tool Registry API"
 readme = "README.md"
-title = "FAIR Assessment Proxy"
 requires-python = ">=3.12.8"
 dependencies = [
     "cryptography>=46.0.5",

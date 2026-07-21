@@ -14,11 +14,18 @@ services:
       FUJI_USERNAME: "fair-service"
       FUJI_PASSWORD: "change-this-password"
 
+      # FAIR Champion / FAIR Core Tests
+      CHAMPION_BASE_URL: "http://fair-champion:4567/champion"
+      FAIR_CORE_TESTS_BASE_URL: "http://fair-core-tests:8282/tests"
+
       # Optional API settings
       APP_HOST: "0.0.0.0"
       APP_PORT: "8080"
     depends_on:
       - fuji
+      - fair-champion
+      - fair-core-tests
+
     networks:
       - fair-net
 
@@ -32,6 +39,45 @@ services:
       - ./fuji-config/users.py:/usr/src/app/fuji_server/config/users.py:ro
     environment:
       ENABLE_CORS: "true"
+    networks:
+      - fair-net
+
+  fair-champion:
+    image: markw/fair-champion:1.1.11
+    container_name: fair-champion
+    ports:
+      - "8383:4567"
+    environment:
+      RACK_ENV: "production"
+
+      # Champion should use the local FAIR Core Tests container.
+      TEST_HOST: "http://fair-core-tests:8282/tests"
+
+      # Public URL used by Champion when generating links.
+      CHAMP_HOST: "http://localhost:8383/champion"
+      CHAMPION_HOST: "http://localhost:8383/champion"
+
+      # Keep public defaults unless you also deploy the FDP index/proxy locally.
+      FDPINDEX_SPARQL: "https://tools.ostrails.eu/repositories/fdpindex-fdp"
+      FDPINDEXPROXY: "https://tools.ostrails.eu/fdp-index-proxy/proxy"
+    depends_on:
+      - fair-core-tests
+    networks:
+      - fair-net
+
+  fair-core-tests:
+    image: markw/fair-core-tests:0.3.6
+    container_name: fair-core-tests
+    ports:
+      - "8282:8282"
+    environment:
+      TEST_PROTOCOL: "http"
+      TEST_HOST: "fair-core-tests:8282"
+      TEST_PATH: "/tests/"
+
+      # Optional. Some tests may need external service keys.
+      FAIRSHARING_KEY: "${FAIRSHARING_KEY:-}"
+      BING_API: "${BING_API:-}"
     networks:
       - fair-net
 
