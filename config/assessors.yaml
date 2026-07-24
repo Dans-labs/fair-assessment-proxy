@@ -4,8 +4,6 @@ assessors:
     class: "fair_assessment_proxy.plugins.fuji.FujiAssessor"
     name: "F-UJI"
     base_url: "http://fuji:1071/fuji/api/v1"
-    username_env: "FUJI_USERNAME"
-    password_env: "FUJI_PASSWORD"
 
     cached_mode:
       metadata_service_endpoint: "http://metadata-gateway:3000/oai"
@@ -18,17 +16,4 @@ assessors:
     champion_base_url: "http://fair-champion:4567/champion"
     fair_core_tests_base_url: "http://fair-core-tests:8282/tests"
     metadata_gateway_base_url: "http://metadata-gateway:3000"
-
-    tests:
-      - "test_FM_F1_M_IdentUnique"
-      - "test_FM_F1_M_IdentPersistent"
-      - "fc_structured_metadata"
-      - "test_FM_F3_M_MetaIdent"
-      - "test_FM_F4_M_MetaIndexed"
-      - "test_FM_A1_1_M_OpenProt"
-      - "test_FM_A2_M_MetaLong"
-      - "fc_metadata_kr_language_strong"
-      - "fc_metadata_uses_fair_vocabularies"
-      - "test_FM_I3_M_QualRef"
-      - "test_FM_R1_1_M_StdLic"
 
