@@ -29,6 +29,13 @@ services:
     networks:
       - fair-net
 
+  searxng:
+    image: searxng/searxng:latest
+    volumes:
+      - ./searxng-config/settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - fair-net
+
   fuji:
     image: ghcr.io/pangaea-data-publisher/fuji:latest
     container_name: fuji
@@ -66,18 +73,30 @@ services:
       - fair-net
 
   fair-core-tests:
-    image: markw/fair-core-tests:0.3.6
+    image: markw/fair-core-tests:0.5.5
+    # build:
+    #   context: ../FAIR-Core-Tests/
+    #   dockerfile: Dockerfile
     container_name: fair-core-tests
     ports:
       - "8282:8282"
     environment:
+      SEARXNG_URL: http://searxng:8080/search
+      SEARXNG_OPEN_TIMEOUT: "5"
+      SEARXNG_READ_TIMEOUT: "20"
       TEST_PROTOCOL: "http"
       TEST_HOST: "fair-core-tests:8282"
       TEST_PATH: "/tests/"
-
-      # Optional. Some tests may need external service keys.
-      FAIRSHARING_KEY: "${FAIRSHARING_KEY:-}"
-      BING_API: "${BING_API:-}"
+      FAIRSHARING_KEY: "your_fairsharing_key_here"
+    depends_on:
+      - searxng
+    networks:
+      - fair-net
+  
+  tika:
+    image: apache/tika:3.3.0.0
+    container_name: evaluator-tika
+    restart: always
     networks:
       - fair-net
 
