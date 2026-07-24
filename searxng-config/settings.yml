@@ -1,0 +1,17 @@
+use_default_settings:
+  engines:
+    keep_only:
+      - google
+      - brave
+      - qwant
+      - mojeek
+
+server:
+  secret_key: "your-long-secret-key-here"
+  limiter: false
+  image_proxy: false
+
+search:
+  formats:
+    - html
+    - json
