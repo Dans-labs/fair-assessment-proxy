@@ -10,6 +10,9 @@
 
 ```bash
 docker compose up --build
+
+# Or with a custom host port (default: 8080)
+FAIR_PROXY_PORT=9090 docker compose up
 ```
 
 ## Test (Development)

@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: fair-assessment-proxy
     ports:
-      - "8080:8080"
+      - "${FAIR_PROXY_PORT:-8080}:8080"
     environment:
       # Internal Docker URL, not localhost
       FUJI_BASE_URL: "http://fuji:1071/fuji/api/v1"
