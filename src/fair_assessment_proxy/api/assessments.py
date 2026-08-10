@@ -36,6 +36,47 @@ class AssessmentCreated(BaseModel):
     status: str
 
 
+async def run_assessment(assessment_id: str):
+    assessment = ASSESSMENTS[assessment_id]
+
+    assessment["status"] = "running"
+
+    context = AssessmentContext(
+        pid=assessment["pid"],
+        mode=assessment["mode"],
+    )
+
+    results = await asyncio.gather(
+        *[
+            PLUGINS[assessor_id].assess(context)
+            for assessor_id in assessment["assessors"]
+        ],
+        return_exceptions=True,
+    )
+
+    has_failure = False
+    stored_results = []
+
+    for result in results:
+        if isinstance(result, Exception):
+            has_failure = True
+            stored_results.append(
+                {
+                    "status": "failed",
+                    "error": str(result),
+                }
+            )
+        else:
+            stored_results.append(result.model_dump())
+
+            if result.status == "failed":
+                has_failure = True
+
+    assessment["results"] = stored_results
+    assessment["completed_at"] = now_iso()
+    assessment["status"] = "completed_with_errors" if has_failure else "completed"
+
+
 @router.post("/", response_model=AssessmentCreated, tags=["Assessments"])
 async def create_assessment(req: AssessmentRequest):
     selected = req.assessors or list(PLUGINS.keys())
@@ -55,29 +96,13 @@ async def create_assessment(req: AssessmentRequest):
         "pid": req.pid,
         "mode": req.mode,
         "assessors": selected,
-        "status": "running",
+        "status": "queued",
         "created_at": now_iso(),
         "completed_at": None,
         "results": [],
     }
 
-    context = AssessmentContext(
-        pid=req.pid,
-        mode=req.mode,
-    )
-
-    results = await asyncio.gather(
-        *[PLUGINS[assessor_id].assess(context) for assessor_id in selected]
-    )
-
-    ASSESSMENTS[assessment_id]["results"] = [result.model_dump() for result in results]
-    ASSESSMENTS[assessment_id]["completed_at"] = now_iso()
-
-    has_failure = any(result.status == "failed" for result in results)
-
-    ASSESSMENTS[assessment_id]["status"] = (
-        "completed_with_errors" if has_failure else "completed"
-    )
+    asyncio.create_task(run_assessment(assessment_id))
 
     return AssessmentCreated(
         id=assessment_id,
