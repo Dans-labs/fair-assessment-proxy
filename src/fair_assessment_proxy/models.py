@@ -14,12 +14,49 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+import uuid
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column
+from fair_assessment_proxy.db import Base
 
 
-class Base(DeclarativeBase):
-    pass
+class RawAssessment(Base):
+    __tablename__ = "raw_assessments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    assessment_id: Mapped[str] = mapped_column(
+        String,
+        index=True,
+        nullable=False,
+    )
+
+    doi: Mapped[str] = mapped_column(
+        String,
+        index=True,
+        nullable=False,
+    )
+
+    assessor: Mapped[str] = mapped_column(
+        String,
+        index=True,
+        nullable=False,
+    )
+
+    raw: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+    )
+
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
 
 
 class AssessmentMode(str, enum.Enum):

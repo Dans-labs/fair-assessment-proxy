@@ -22,10 +22,32 @@ services:
       APP_HOST: "0.0.0.0"
       APP_PORT: "8080"
     depends_on:
-      - fuji
-      - fair-champion
-      - fair-core-tests
+      fuji:
+        condition: service_started
+      fair-champion:
+        condition: service_started
+      fair-core-tests:
+        condition: service_started
+      postgres:
+        condition: service_healthy
 
+    networks:
+      - fair-net
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: fairdb
+      POSTGRES_USER: fairman
+      POSTGRES_PASSWORD: changeme
+    volumes:
+      - fair_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fairman -d fairdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
     networks:
       - fair-net
 
@@ -99,6 +121,9 @@ services:
     restart: always
     networks:
       - fair-net
+
+volumes:
+  fair_postgres_data:
 
 networks:
   fair-net:

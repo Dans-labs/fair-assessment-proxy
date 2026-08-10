@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fair_assessment_proxy.api import root, assessments, profiles, assessors
 from fair_assessment_proxy.config import (
@@ -14,6 +15,7 @@ from typing import Any
 from fair_assessment_proxy.models import AssessmentRequest
 from fair_assessment_proxy.plugin_loader import load_assessor_plugins
 from fair_assessment_proxy.plugins.base import AssessmentContext
+from fair_assessment_proxy.db import Base, engine
 
 init_logging()
 logger = logging.getLogger(__name__)
@@ -28,7 +30,18 @@ PLUGINS = load_assessor_plugins()
 ASSESSMENTS: dict[str, dict[str, Any]] = {}
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    yield
+
+    await engine.dispose()
+
+
 app = FastAPI(
+    lifespan=lifespan,
     # title=project_details["title"],
     # description=project_details["description"],
     # version=f"{project_details['version']} (Build Date: {build_date})",
