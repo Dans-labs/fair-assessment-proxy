@@ -18,6 +18,137 @@ import uuid
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from fair_assessment_proxy.db import Base
+from enum import Enum
+from sqlalchemy import DateTime, Enum as SQLEnum, String, func
+
+
+class Assessment(Base):
+    __tablename__ = "assessments"
+
+    id: Mapped[str] = mapped_column(
+        String,
+        primary_key=True,
+    )
+
+    pid: Mapped[str] = mapped_column(
+        String,
+        index=True,
+        nullable=False,
+    )
+
+    mode: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    assessors: Mapped[list[str]] = mapped_column(
+        JSONB,
+        nullable=False,
+    )
+
+    cached: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+class FairOutcome(str, Enum):
+    PASS = "pass"
+    FAIL = "fail"
+    PARTIAL = "partial"
+    INDETERMINATE = "indeterminate"
+    NOT_APPLICABLE = "not_applicable"
+    ERROR = "error"
+    UNAVAILABLE = "unavailable"
+
+
+fair_outcome = SQLEnum(
+    FairOutcome,
+    name="fair_outcome",
+    values_callable=lambda enum: [e.value for e in enum],
+)
+
+
+class HarmonizedAssessment(Base):
+    __tablename__ = "harmonized_assessments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    assessment_id: Mapped[str] = mapped_column(
+        String,
+        index=True,
+        nullable=False,
+    )
+
+    doi: Mapped[str] = mapped_column(
+        String,
+        index=True,
+        nullable=False,
+    )
+
+    assessor: Mapped[str] = mapped_column(
+        String,
+        index=True,
+        nullable=False,
+    )
+
+    mode: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    # Findable
+    f: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    f1: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    f2: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    f3: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    f4: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+
+    # Accessible
+    a: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    a1: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    a1_1: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    a1_2: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    a2: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+
+    # Interoperable
+    i: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    i1: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    i2: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    i3: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+
+    # Reusable
+    r: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    r1: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    r1_1: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    r1_2: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+    r1_3: Mapped[FairOutcome] = mapped_column(fair_outcome, nullable=False)
+
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
 
 
 class RawAssessment(Base):
@@ -32,6 +163,11 @@ class RawAssessment(Base):
     assessment_id: Mapped[str] = mapped_column(
         String,
         index=True,
+        nullable=False,
+    )
+
+    mode: Mapped[str] = mapped_column(
+        String,
         nullable=False,
     )
 
@@ -68,6 +204,7 @@ class AssessmentMode(str, enum.Enum):
 class AssessmentRequest(BaseModel):
     pid: str = Field(..., examples=["https://doi.org/10.1594/PANGAEA.908011"])
     mode: AssessmentMode = AssessmentMode.public
+    cached: bool = False
     assessors: list[str] | None = None
 
 
