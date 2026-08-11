@@ -11,6 +11,7 @@ from fair_assessment_proxy.models import (
     AssessmentRequest,
     RawAssessment,
     HarmonizedAssessment,
+    Assessment,
 )
 from fair_assessment_proxy.db import AsyncSessionLocal, get_db
 from fair_assessment_proxy.plugin_loader import load_assessor_plugins
@@ -156,84 +157,132 @@ async def get_assessment_result(
 
 
 async def run_assessment(assessment_id: str):
-    assessment = ASSESSMENTS[assessment_id]
-    assessment["status"] = "running"
+    async with AsyncSessionLocal() as db:
+        assessment = await db.get(
+            Assessment,
+            assessment_id,
+        )
+
+        if assessment is None:
+            return
+
+        pid = assessment.pid
+        mode = assessment.mode
+        assessors = assessment.assessors
+        use_cache = assessment.cached
+
+        assessment.status = "running"
+        await db.commit()
 
     context = AssessmentContext(
-        pid=assessment["pid"],
-        mode=assessment["mode"],
+        pid=pid,
+        mode=mode,
     )
 
     async def run_assessor(assessor_id: str):
-        if assessment["cached"]:
-            stored_result = await get_assessment_result(
-                pid=assessment["pid"],
-                mode=assessment["mode"],
+        try:
+            if use_cache:
+                stored_result = await get_assessment_result(
+                    pid=pid,
+                    mode=mode,
+                    assessor_id=assessor_id,
+                )
+
+                if stored_result is not None:
+                    return {
+                        "assessor": assessor_id,
+                        "status": "completed",
+                        "cached": True,
+                    }
+
+            result = await PLUGINS[assessor_id].assess(context)
+            result_data = result.model_dump()
+
+            await store_assessment_result(
+                assessment_id=assessment_id,
+                pid=pid,
+                mode=mode,
                 assessor_id=assessor_id,
+                raw=result_data["raw"],
+                normalised=result_data["normalised"],
             )
 
-            if stored_result is not None:
-                return {
-                    "assessor": assessor_id,
-                    "status": "completed",
-                    "raw": stored_result["raw"],
-                    "normalised": stored_result["normalised"],
-                    "cached": True,
-                }
+            return {
+                "assessor": assessor_id,
+                "status": result_data["status"],
+                "cached": False,
+            }
 
-        result = await PLUGINS[assessor_id].assess(context)
-        result_data = result.model_dump()
-
-        raw = result_data["raw"]
-        normalised = result_data["normalised"]
-
-        await store_assessment_result(
-            assessment_id=assessment_id,
-            pid=assessment["pid"],
-            mode=assessment["mode"],
-            assessor_id=assessor_id,
-            raw=raw,
-            normalised=normalised,
-        )
-
-        return {
-            "assessor": assessor_id,
-            "status": result_data["status"],
-            "raw": raw,
-            "normalised": normalised,
-            "cached": False,
-        }
+        except Exception as exc:
+            return {
+                "assessor": assessor_id,
+                "status": "failed",
+                "cached": False,
+                "error": str(exc),
+            }
 
     results = await asyncio.gather(
-        *[run_assessor(assessor_id) for assessor_id in assessment["assessors"]],
-        return_exceptions=True,
+        *[run_assessor(assessor_id) for assessor_id in assessors]
     )
 
-    stored_results = []
-    has_failure = False
+    has_failure = any(result["status"] == "failed" for result in results)
 
-    for result in results:
-        if isinstance(result, Exception):
-            has_failure = True
+    final_status = "completed_with_errors" if has_failure else "completed"
 
-            stored_results.append(
-                {
-                    "status": "failed",
-                    "cached": False,
-                    "error": str(result),
-                }
+    async with AsyncSessionLocal() as db:
+        assessment = await db.get(
+            Assessment,
+            assessment_id,
+        )
+
+        assessment.status = final_status
+        assessment.completed_at = datetime.now(timezone.utc)
+
+        await db.commit()
+
+
+async def create_assessment_record(
+    assessment_id: str,
+    pid: str,
+    mode: str,
+    assessors: list[str] | None = None,
+    cached: bool = False,
+):
+    async with AsyncSessionLocal() as db:
+        db.add(
+            Assessment(
+                id=assessment_id,
+                pid=pid,
+                mode=mode,
+                assessors=assessors or list(PLUGINS.keys()),
+                cached=cached,
+                status="queued",
             )
-            continue
+        )
 
-        stored_results.append(result)
+        await db.commit()
 
-        if result["status"] == "failed":
-            has_failure = True
 
-    assessment["results"] = stored_results
-    assessment["completed_at"] = now_iso()
+async def update_assessment_status(
+    assessment_id: str,
+    status: str,
+    completed_at=None,
+):
+    async with AsyncSessionLocal() as db:
+        assessment = await db.get(
+            Assessment,
+            assessment_id,
+        )
 
-    assessment["status"] = "completed_with_errors" if has_failure else "completed"
+        if assessment is None:
+            return
+
+        assessment.status = status
+
+        if completed_at is not None:
+            assessment.completed_at = completed_at
+
+        await db.commit()
 
 
 @router.post("/", response_model=AssessmentCreated, tags=["Assessments"])
@@ -250,34 +299,114 @@ async def create_assessment(req: AssessmentRequest):
 
     assessment_id = str(uuid.uuid4())
 
-    ASSESSMENTS[assessment_id] = {
-        "id": assessment_id,
-        "pid": req.pid,
-        "mode": req.mode,
-        "assessors": selected,
-        "cached": req.cached,
-        "status": "queued",
-        "created_at": now_iso(),
-        "completed_at": None,
-        "results": [],
-    }
+    await create_assessment_record(
+        assessment_id=assessment_id,
+        pid=req.pid,
+        mode=req.mode,
+        assessors=selected,
+        cached=req.cached,
+    )
 
     asyncio.create_task(run_assessment(assessment_id))
 
     return AssessmentCreated(
         id=assessment_id,
-        status=ASSESSMENTS[assessment_id]["status"],
+        status="queued",
     )
 
 
 @router.get("/{assessment_id}", tags=["Assessments"])
 async def get_assessment(assessment_id: str):
-    assessment = ASSESSMENTS.get(assessment_id)
+    async with AsyncSessionLocal() as db:
+        assessment = await db.get(
+            Assessment,
+            assessment_id,
+        )
 
-    if not assessment:
-        raise HTTPException(status_code=404, detail="Assessment not found")
+        if assessment is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Assessment not found",
+            )
 
-    return assessment
+        stmt = (
+            select(HarmonizedAssessment)
+            .where(HarmonizedAssessment.assessment_id == assessment_id)
+            .order_by(HarmonizedAssessment.assessor)
+        )
+
+        result = await db.execute(stmt)
+        rows = result.scalars().all()
+
+        return {
+            "id": assessment.id,
+            "pid": assessment.pid,
+            "mode": assessment.mode,
+            "assessors": assessment.assessors,
+            "status": assessment.status,
+            "created_at": assessment.created_at,
+            "completed_at": assessment.completed_at,
+            "results": [
+                {
+                    "assessor": row.assessor,
+                    "f": row.f,
+                    "f1": row.f1,
+                    "f2": row.f2,
+                    "f3": row.f3,
+                    "f4": row.f4,
+                    "a": row.a,
+                    "a1": row.a1,
+                    "a1_1": row.a1_1,
+                    "a1_2": row.a1_2,
+                    "a2": row.a2,
+                    "i": row.i,
+                    "i1": row.i1,
+                    "i2": row.i2,
+                    "i3": row.i3,
+                    "r": row.r,
+                    "r1": row.r1,
+                    "r1_1": row.r1_1,
+                    "r1_2": row.r1_2,
+                    "r1_3": row.r1_3,
+                }
+                for row in rows
+            ],
+        }
+
+
+# @router.get("/{assessment_id}", tags=["Assessments"])
+# async def get_assessment(assessment_id: str):
+#     async with AsyncSessionLocal() as db:
+#         assessment = await db.get(
+#             Assessment,
+#             assessment_id,
+#         )
+#
+#         if assessment is None:
+#             raise HTTPException(
+#                 status_code=404,
+#                 detail="Assessment not found",
+#             )
+#
+#         return {
+#             "id": assessment.id,
+#             "pid": assessment.pid,
+#             "mode": assessment.mode,
+#             "assessors": assessment.assessors,
+#             "status": assessment.status,
+#             "created_at": assessment.created_at,
+#             "completed_at": assessment.completed_at,
+#         }
+
+
+# @router.get("/{assessment_id}", tags=["Assessments"])
+# async def get_assessment(assessment_id: str):
+#     assessment = ASSESSMENTS.get(assessment_id)
+#
+#     if not assessment:
+#         raise HTTPException(status_code=404, detail="Assessment not found")
+#
+#     return assessment
 
 
 @router.get("/{assessment_id}/results/{assessor_id}", tags=["Assessments"])

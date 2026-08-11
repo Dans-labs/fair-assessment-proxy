@@ -22,6 +22,52 @@ from enum import Enum
 from sqlalchemy import DateTime, Enum as SQLEnum, String, func
 
 
+class Assessment(Base):
+    __tablename__ = "assessments"
+
+    id: Mapped[str] = mapped_column(
+        String,
+        primary_key=True,
+    )
+
+    pid: Mapped[str] = mapped_column(
+        String,
+        index=True,
+        nullable=False,
+    )
+
+    mode: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
+    assessors: Mapped[list[str]] = mapped_column(
+        JSONB,
+        nullable=False,
+    )
+
+    cached: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
 class FairOutcome(str, Enum):
     PASS = "pass"
     FAIL = "fail"
