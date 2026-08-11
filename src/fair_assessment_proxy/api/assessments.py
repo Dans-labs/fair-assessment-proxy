@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel
 import uuid
 import asyncio
+from urllib.parse import unquote
 from fastapi import HTTPException
 from sqlalchemy import select
 from fair_assessment_proxy.models import (
@@ -13,7 +14,7 @@ from fair_assessment_proxy.models import (
     HarmonizedAssessment,
     Assessment,
 )
-from fair_assessment_proxy.db import AsyncSessionLocal, get_db
+from fair_assessment_proxy.db import AsyncSessionLocal
 from fair_assessment_proxy.plugin_loader import load_assessor_plugins
 from fair_assessment_proxy.plugins.base import AssessmentContext
 
@@ -29,10 +30,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def get_assessments():
-    return {
-        "status": "ok",
-    }
+def normalize_pid(pid: str) -> str:
+    pid = unquote(pid).strip()
+
+    prefixes = (
+        "https://doi.org/",
+        "http://doi.org/",
+        "https://dx.doi.org/",
+        "http://dx.doi.org/",
+        "doi.org/",
+        "dx.doi.org/",
+        "doi:",
+    )
+
+    lower = pid.lower()
+
+    for prefix in prefixes:
+        if lower.startswith(prefix):
+            pid = pid[len(prefix) :]
+            break
+
+    return pid.strip()
 
 
 class AssessmentCreated(BaseModel):
@@ -301,7 +319,7 @@ async def create_assessment(req: AssessmentRequest):
 
     await create_assessment_record(
         assessment_id=assessment_id,
-        pid=req.pid,
+        pid=normalize_pid(req.pid),
         mode=req.mode,
         assessors=selected,
         cached=req.cached,
@@ -315,8 +333,73 @@ async def create_assessment(req: AssessmentRequest):
     )
 
 
+@router.get("/latest", tags=["Assessments"])
+async def get_latest_assessment(pid: str):
+    pid = normalize_pid(pid)
+    async with AsyncSessionLocal() as db:
+        stmt = (
+            select(Assessment)
+            .where(Assessment.pid == pid)
+            .order_by(Assessment.created_at.desc())
+            .limit(1)
+        )
+
+        result = await db.execute(stmt)
+        assessment = result.scalar_one_or_none()
+
+        if assessment is None:
+            raise HTTPException(
+                status_code=404,
+                detail="No assessment found for PID",
+            )
+
+        harmonized_stmt = (
+            select(HarmonizedAssessment)
+            .where(HarmonizedAssessment.assessment_id == assessment.id)
+            .order_by(HarmonizedAssessment.assessor)
+        )
+
+        result = await db.execute(harmonized_stmt)
+        rows = result.scalars().all()
+
+        return {
+            "id": assessment.id,
+            "pid": assessment.pid,
+            "mode": assessment.mode,
+            "assessors": assessment.assessors,
+            "status": assessment.status,
+            "created_at": assessment.created_at,
+            "completed_at": assessment.completed_at,
+            "results": [
+                {
+                    "assessor": row.assessor,
+                    "f": row.f,
+                    "f1": row.f1,
+                    "f2": row.f2,
+                    "f3": row.f3,
+                    "f4": row.f4,
+                    "a": row.a,
+                    "a1": row.a1,
+                    "a1_1": row.a1_1,
+                    "a1_2": row.a1_2,
+                    "a2": row.a2,
+                    "i": row.i,
+                    "i1": row.i1,
+                    "i2": row.i2,
+                    "i3": row.i3,
+                    "r": row.r,
+                    "r1": row.r1,
+                    "r1_1": row.r1_1,
+                    "r1_2": row.r1_2,
+                    "r1_3": row.r1_3,
+                }
+                for row in rows
+            ],
+        }
+
+
 @router.get("/{assessment_id}", tags=["Assessments"])
-async def get_assessment(assessment_id: str):
+async def get_assessment_by_id(assessment_id: str):
     async with AsyncSessionLocal() as db:
         assessment = await db.get(
             Assessment,
@@ -374,53 +457,79 @@ async def get_assessment(assessment_id: str):
         }
 
 
-# @router.get("/{assessment_id}", tags=["Assessments"])
-# async def get_assessment(assessment_id: str):
-#     async with AsyncSessionLocal() as db:
-#         assessment = await db.get(
-#             Assessment,
-#             assessment_id,
-#         )
-#
-#         if assessment is None:
-#             raise HTTPException(
-#                 status_code=404,
-#                 detail="Assessment not found",
-#             )
-#
-#         return {
-#             "id": assessment.id,
-#             "pid": assessment.pid,
-#             "mode": assessment.mode,
-#             "assessors": assessment.assessors,
-#             "status": assessment.status,
-#             "created_at": assessment.created_at,
-#             "completed_at": assessment.completed_at,
-#         }
+@router.get("/{assessment_id}/raw", tags=["Assessments"])
+async def get_raw_assessment(assessment_id: str):
+    async with AsyncSessionLocal() as db:
+        assessment = await db.get(
+            Assessment,
+            assessment_id,
+        )
+
+        if assessment is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Assessment not found",
+            )
+
+        stmt = (
+            select(RawAssessment)
+            .where(RawAssessment.assessment_id == assessment_id)
+            .order_by(RawAssessment.assessor)
+        )
+
+        result = await db.execute(stmt)
+        rows = result.scalars().all()
+
+        return {
+            "id": assessment.id,
+            "pid": assessment.pid,
+            "mode": assessment.mode,
+            "status": assessment.status,
+            "created_at": assessment.created_at,
+            "completed_at": assessment.completed_at,
+            "results": [
+                {
+                    "assessor": row.assessor,
+                    "timestamp": row.timestamp,
+                    "raw": row.raw,
+                }
+                for row in rows
+            ],
+        }
 
 
-# @router.get("/{assessment_id}", tags=["Assessments"])
-# async def get_assessment(assessment_id: str):
-#     assessment = ASSESSMENTS.get(assessment_id)
-#
-#     if not assessment:
-#         raise HTTPException(status_code=404, detail="Assessment not found")
-#
-#     return assessment
+@router.get("/", tags=["Assessments"])
+async def get_assessments(
+    pid: str,
+    assessor: str | None = None,
+    mode: str | None = None,
+):
+    pid = normalize_pid(pid)
+    async with AsyncSessionLocal() as db:
+        stmt = (
+            select(Assessment)
+            .where(Assessment.pid == pid)
+            .order_by(Assessment.created_at.desc())
+        )
 
+        if mode is not None:
+            stmt = stmt.where(Assessment.mode == mode)
 
-@router.get("/{assessment_id}/results/{assessor_id}", tags=["Assessments"])
-async def get_assessor_result(assessment_id: str, assessor_id: str):
-    assessment = ASSESSMENTS.get(assessment_id)
+        result = await db.execute(stmt)
+        assessments = result.scalars().all()
 
-    if not assessment:
-        raise HTTPException(status_code=404, detail="Assessment not found")
+        if assessor is not None:
+            assessments = [a for a in assessments if assessor in a.assessors]
 
-    for result in assessment["results"]:
-        if result["assessor_id"] == assessor_id:
-            return result
-
-    raise HTTPException(
-        status_code=404,
-        detail=f"No result for assessor: {assessor_id}",
-    )
+        return [
+            {
+                "id": assessment.id,
+                "pid": assessment.pid,
+                "mode": assessment.mode,
+                "assessors": assessment.assessors,
+                "status": assessment.status,
+                "created_at": assessment.created_at,
+                "completed_at": assessment.completed_at,
+            }
+            for assessment in assessments
+        ]
