@@ -1,15 +1,18 @@
 import logging
-from fastapi import APIRouter, Depends
-from starlette.responses import JSONResponse
+from fastapi import APIRouter
 from datetime import datetime, timezone
 from typing import Any
 from pydantic import BaseModel
 import uuid
 import asyncio
-from fastapi import FastAPI, HTTPException
-from fair_assessment_proxy.config import get_app_version
-from fair_assessment_proxy.security import validate_token, TOKEN_PORTAL
-from fair_assessment_proxy.models import AssessmentRequest
+from fastapi import HTTPException
+from sqlalchemy import select
+from fair_assessment_proxy.models import (
+    AssessmentRequest,
+    RawAssessment,
+    HarmonizedAssessment,
+)
+from fair_assessment_proxy.db import AsyncSessionLocal, get_db
 from fair_assessment_proxy.plugin_loader import load_assessor_plugins
 from fair_assessment_proxy.plugins.base import AssessmentContext
 
@@ -36,6 +39,122 @@ class AssessmentCreated(BaseModel):
     status: str
 
 
+async def store_assessment_result(
+    *,
+    assessment_id: str,
+    pid: str,
+    mode: str,
+    assessor_id: str,
+    raw: dict,
+    normalised: dict,
+):
+    async with AsyncSessionLocal() as db:
+        raw_record = RawAssessment(
+            assessment_id=assessment_id,
+            doi=pid,
+            mode=mode,
+            assessor=assessor_id,
+            raw=raw,
+        )
+
+        harmonized_record = HarmonizedAssessment(
+            assessment_id=assessment_id,
+            doi=pid,
+            mode=mode,
+            assessor=assessor_id,
+            f=normalised["f"],
+            f1=normalised["f1"],
+            f2=normalised["f2"],
+            f3=normalised["f3"],
+            f4=normalised["f4"],
+            a=normalised["a"],
+            a1=normalised["a"],
+            a1_1=normalised["a1_1"],
+            a1_2=normalised["a1_2"],
+            a2=normalised["a2"],
+            i=normalised["i"],
+            i1=normalised["i1"],
+            i2=normalised["i2"],
+            i3=normalised["i3"],
+            r=normalised["r"],
+            r1=normalised["r1"],
+            r1_1=normalised["r1_1"],
+            r1_2=normalised["r1_2"],
+            r1_3=normalised["r1_3"],
+        )
+
+        db.add(raw_record)
+        db.add(harmonized_record)
+
+        await db.commit()
+
+
+async def get_assessment_result(
+    *,
+    pid: str,
+    mode: str,
+    assessor_id: str,
+) -> dict | None:
+    async with AsyncSessionLocal() as db:
+        raw_stmt = (
+            select(RawAssessment)
+            .where(
+                RawAssessment.doi == pid,
+                RawAssessment.mode == mode,
+                RawAssessment.assessor == assessor_id,
+            )
+            .order_by(RawAssessment.timestamp.desc())
+            .limit(1)
+        )
+
+        raw_result = await db.execute(raw_stmt)
+        raw_record = raw_result.scalar_one_or_none()
+
+        if raw_record is None:
+            return None
+
+        harmonized_stmt = (
+            select(HarmonizedAssessment)
+            .where(
+                HarmonizedAssessment.assessment_id == raw_record.assessment_id,
+                HarmonizedAssessment.assessor == assessor_id,
+            )
+            .limit(1)
+        )
+
+        harmonized_result = await db.execute(harmonized_stmt)
+        h = harmonized_result.scalar_one_or_none()
+
+        if h is None:
+            return None
+
+        return {
+            "raw": raw_record.raw,
+            "normalised": {
+                "assessor": assessor_id,
+                "f": h.f,
+                "f1": h.f1,
+                "f2": h.f2,
+                "f3": h.f3,
+                "f4": h.f4,
+                "a": h.a,
+                "a1": h.a1,
+                "a1_1": h.a1_1,
+                "a1_2": h.a1_2,
+                "a2": h.a2,
+                "i": h.i,
+                "i1": h.i1,
+                "i2": h.i2,
+                "i3": h.i3,
+                "r": h.r,
+                "r1": h.r1,
+                "r1_1": h.r1_1,
+                "r1_2": h.r1_2,
+                "r1_3": h.r1_3,
+            },
+        }
+
+
 async def run_assessment(assessment_id: str):
     assessment = ASSESSMENTS[assessment_id]
     assessment["status"] = "running"
@@ -47,31 +166,41 @@ async def run_assessment(assessment_id: str):
 
     async def run_assessor(assessor_id: str):
         if assessment["cached"]:
-            cached_result = await get_cached_result(
+            stored_result = await get_assessment_result(
                 pid=assessment["pid"],
                 mode=assessment["mode"],
                 assessor_id=assessor_id,
             )
 
-            if cached_result is not None:
+            if stored_result is not None:
                 return {
-                    **cached_result,
+                    "assessor": assessor_id,
+                    "status": "completed",
+                    "raw": stored_result["raw"],
+                    "normalised": stored_result["normalised"],
                     "cached": True,
                 }
 
         result = await PLUGINS[assessor_id].assess(context)
-
         result_data = result.model_dump()
 
-        await store_cached_result(
+        raw = result_data["raw"]
+        normalised = result_data["normalised"]
+
+        await store_assessment_result(
+            assessment_id=assessment_id,
             pid=assessment["pid"],
             mode=assessment["mode"],
             assessor_id=assessor_id,
-            result=result_data,
+            raw=raw,
+            normalised=normalised,
         )
 
         return {
-            **result_data,
+            "assessor": assessor_id,
+            "status": result_data["status"],
+            "raw": raw,
+            "normalised": normalised,
             "cached": False,
         }
 
@@ -86,6 +215,7 @@ async def run_assessment(assessment_id: str):
     for result in results:
         if isinstance(result, Exception):
             has_failure = True
+
             stored_results.append(
                 {
                     "status": "failed",
@@ -93,56 +223,17 @@ async def run_assessment(assessment_id: str):
                     "error": str(result),
                 }
             )
-        else:
-            stored_results.append(result)
+            continue
 
-            if result["status"] == "failed":
-                has_failure = True
+        stored_results.append(result)
+
+        if result["status"] == "failed":
+            has_failure = True
 
     assessment["results"] = stored_results
     assessment["completed_at"] = now_iso()
+
     assessment["status"] = "completed_with_errors" if has_failure else "completed"
-
-
-# async def run_assessment(assessment_id: str):
-#     assessment = ASSESSMENTS[assessment_id]
-#
-#     assessment["status"] = "running"
-#
-#     context = AssessmentContext(
-#         pid=assessment["pid"],
-#         mode=assessment["mode"],
-#     )
-#
-#     results = await asyncio.gather(
-#         *[
-#             PLUGINS[assessor_id].assess(context)
-#             for assessor_id in assessment["assessors"]
-#         ],
-#         return_exceptions=True,
-#     )
-#
-#     has_failure = False
-#     stored_results = []
-#
-#     for result in results:
-#         if isinstance(result, Exception):
-#             has_failure = True
-#             stored_results.append(
-#                 {
-#                     "status": "failed",
-#                     "error": str(result),
-#                 }
-#             )
-#         else:
-#             stored_results.append(result.model_dump())
-#
-#             if result.status == "failed":
-#                 has_failure = True
-#
-#     assessment["results"] = stored_results
-#     assessment["completed_at"] = now_iso()
-#     assessment["status"] = "completed_with_errors" if has_failure else "completed"
 
 
 @router.post("/", response_model=AssessmentCreated, tags=["Assessments"])
