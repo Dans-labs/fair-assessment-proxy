@@ -8,7 +8,7 @@ from typing import Any
 import yaml
 
 settings = Dynaconf(
-    envvar_prefix="TOOL_REGISTRY",
+    envvar_prefix="FAIR_PROXY",
     settings_files=["config/config.toml", "config/.secrets.toml"],
 )
 
@@ -25,7 +25,7 @@ class DatabaseConfig:
 @dataclass(frozen=True)
 class ServiceConfig:
     admin_auth_key: str
-    name: str = "Tool Registry Service"
+    name: str = "Fair Assessment Proxy"
     listen_port: int = 8080
     bind_address: str = "0.0.0.0"
     api_prefix: str = "/api/v1"

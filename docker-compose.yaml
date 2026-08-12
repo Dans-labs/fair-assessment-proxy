@@ -15,6 +15,15 @@ services:
       # FAIR Champion / FAIR Core Tests
       CHAMPION_BASE_URL: "http://fair-champion:4567/champion"
       FAIR_CORE_TESTS_BASE_URL: "http://fair-core-tests:8282/tests"
+      
+      FAIR_PROXY_DATABASE__HOST: ${POSTGRES_HOST:-postgres}
+      FAIR_PROXY_DATABASE__PORT: ${POSTGRES_PORT:-5432}
+      FAIR_PROXY_DATABASE__NAME: ${POSTGRES_DB}
+      FAIR_PROXY_DATABASE__USER: ${POSTGRES_USER}
+      FAIR_PROXY_DATABASE__PASSWORD: ${POSTGRES_PASSWORD}
+
+      FAIR_PROXY_SERVICE__ADMIN_AUTH_KEY: ${FAIR_PROXY_SERVICE__ADMIN_AUTH_KEY}
+      FAIR_PROXY_SERVICE__EGI_ENV: development
 
       # Optional API settings
       APP_HOST: "0.0.0.0"
