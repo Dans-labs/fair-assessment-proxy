@@ -1,4 +1,5 @@
-*.override.*
+*compose.override.*
+*compose.dev.*
 cache/
 
 # Byte-compiled / optimized / DLL files
