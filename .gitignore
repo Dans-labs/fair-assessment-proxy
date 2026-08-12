@@ -1,5 +1,7 @@
 *compose.override.*
 *compose.dev.*
+config/.secrets.toml
+
 cache/
 
 # Byte-compiled / optimized / DLL files
