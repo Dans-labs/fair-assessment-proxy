@@ -2,15 +2,15 @@ services:
   fair-assessment-proxy:
     image: ghcr.io/dans-labs/fair-assessment-proxy:latest
     container_name: fair-assessment-proxy
-    ports:
-      - "${FAIR_PROXY_PORT:-8080}:8080"
+    # ports:
+    #   - "${FAIR_PROXY_PORT:-8080}:8080"
     environment:
       # Internal Docker URL, not localhost
       FUJI_BASE_URL: "http://fuji:1071/fuji/api/v1"
 
       # Basic auth used by the proxy when calling F-UJI
-      FUJI_USERNAME: "fair-service"
-      FUJI_PASSWORD: "change-this-password"
+      FUJI_USERNAME: ${FUJI_USERNAME}
+      FUJI_PASSWORD: ${FUJI_PASSWORD}
 
       # FAIR Champion / FAIR Core Tests
       CHAMPION_BASE_URL: "http://fair-champion:4567/champion"
@@ -35,13 +35,13 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: fairdb
-      POSTGRES_USER: fairman
-      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - fair_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fairman -d fairdb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -59,8 +59,8 @@ services:
   fuji:
     image: ghcr.io/pangaea-data-publisher/fuji:latest
     container_name: fuji
-    ports:
-      - "1071:1071"
+    # ports:
+    #   - "1071:1071"
     volumes:
       # Override F-UJI users.py so you control basic auth credentials
       - ./fuji-config/users.py:/usr/src/app/fuji_server/config/users.py:ro
@@ -72,8 +72,8 @@ services:
   fair-champion:
     image: markw/fair-champion:1.1.11
     container_name: fair-champion
-    ports:
-      - "8383:4567"
+    # ports:
+    #   - "8383:4567"
     environment:
       RACK_ENV: "production"
 
@@ -94,12 +94,9 @@ services:
 
   fair-core-tests:
     image: markw/fair-core-tests:0.5.5
-    # build:
-    #   context: ../FAIR-Core-Tests/
-    #   dockerfile: Dockerfile
     container_name: fair-core-tests
-    ports:
-      - "8282:8282"
+    # ports:
+    #   - "8282:8282"
     environment:
       SEARXNG_URL: http://searxng:8080/search
       SEARXNG_OPEN_TIMEOUT: "5"
