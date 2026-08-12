@@ -1,3 +1,4 @@
+*.override.*
 cache/
 
 # Byte-compiled / optimized / DLL files

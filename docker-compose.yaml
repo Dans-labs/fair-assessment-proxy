@@ -66,6 +66,8 @@ services:
       - ./fuji-config/users.py:/usr/src/app/fuji_server/config/users.py:ro
     environment:
       ENABLE_CORS: "true"
+      FUJI_USERNAME: "${FUJI_USERNAME}"
+      FUJI_PASSWORD: "${FUJI_PASSWORD}"
     networks:
       - fair-net
 
