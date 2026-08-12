@@ -1,6 +1,6 @@
 [project]
 name = "fair-assessment-proxy"
-version = "0.0.1"
+version = "0.0.2"
 description = "A proxy service for the FAIR Assessment Tool Registry API"
 readme = "README.md"
 requires-python = ">=3.12.8"

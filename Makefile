@@ -1,8 +1,8 @@
 export PYTHONPATH := $(PWD)/src:$(PYTHONPATH)
 PORT ?= 8080
 HOST_PORT ?= 8080
-ORG_NAME := eosc-data-commons
-IMAGE_NAME := $(ORG_NAME)/tool-registry
+ORG_NAME := dans-labs
+IMAGE_NAME := $(ORG_NAME)/fair-assessment-proxy
 VERSION = $(shell grep '^version' pyproject.toml | head -1 | cut -d '"' -f2)
 PLATFORMS := linux/amd64,linux/arm64
 
