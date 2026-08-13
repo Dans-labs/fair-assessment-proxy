@@ -15,6 +15,7 @@ class FujiAssessor(AssessorPlugin):
 
             return AssessorResult(
                 assessor_id=self.assessor_id,
+                version=raw.get("software_version"),
                 name=self.name,
                 status="completed",
                 raw=raw,
@@ -22,7 +23,6 @@ class FujiAssessor(AssessorPlugin):
             )
 
         except Exception as exc:
-            print(f"[ERROR] F-UJI assessment failed for {context.pid}: {exc}")
             return AssessorResult(
                 assessor_id=self.assessor_id,
                 name=self.name,
@@ -58,11 +58,15 @@ class FujiAssessor(AssessorPlugin):
                 }
             )
 
-        username = os.getenv(self.config.get("username_env", "FUJI_USERNAME"))
-        password = os.getenv(self.config.get("password_env", "FUJI_PASSWORD"))
+        # username = os.getenv(self.config.get("username_env", "FUJI_USERNAME"))
+        # password = os.getenv(self.config.get("password_env", "FUJI_PASSWORD"))
+        username = os.getenv("FUJI_USERNAME")
+        password = os.getenv("FUJI_PASSWORD")
 
         if not username or not password:
             raise RuntimeError("Missing FUJI basic-auth credentials")
+
+        # print(f"[DEBUG] username: {username}, password: {'*' * len(password)}")
 
         async with httpx.AsyncClient(timeout=180.0) as client:
             response = await client.post(

@@ -112,6 +112,11 @@ class HarmonizedAssessment(Base):
         nullable=False,
     )
 
+    assessor_version: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
     mode: Mapped[str] = mapped_column(
         String,
         nullable=False,
@@ -183,6 +188,11 @@ class RawAssessment(Base):
         nullable=False,
     )
 
+    assessor_version: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
     raw: Mapped[dict] = mapped_column(
         JSONB,
         nullable=False,
@@ -211,6 +221,7 @@ class AssessmentRequest(BaseModel):
 class AssessorResult(BaseModel):
     assessor_id: str
     name: str
+    version: str
     status: str
     raw: Any | None = None
     # normalised: dict[str, Any] | None = None

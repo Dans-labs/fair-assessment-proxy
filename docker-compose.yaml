@@ -66,7 +66,7 @@ services:
       - fair-net
 
   fuji:
-    image: ghcr.io/pangaea-data-publisher/fuji:latest
+    image: ghcr.io/pangaea-data-publisher/fuji:${FUJI_VERSION:-3.5.0}
     container_name: fuji
     # ports:
     #   - "1071:1071"
@@ -81,7 +81,7 @@ services:
       - fair-net
 
   fair-champion:
-    image: markw/fair-champion:1.1.11
+    image: markw/fair-champion:${FAIR_CHAMPION_VERSION:-1.1.11}
     container_name: fair-champion
     # ports:
     #   - "8383:4567"
@@ -104,7 +104,7 @@ services:
       - fair-net
 
   fair-core-tests:
-    image: markw/fair-core-tests:0.5.5
+    image: markw/fair-core-tests:${FAIR_CORE_TESTS_VERSION:-0.5.5}
     container_name: fair-core-tests
     # ports:
     #   - "8282:8282"

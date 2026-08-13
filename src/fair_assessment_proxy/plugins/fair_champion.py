@@ -1,5 +1,6 @@
 from __future__ import annotations
 import httpx
+import os
 from collections import defaultdict
 from typing import Any, Iterable
 from fair_assessment_proxy.models import AssessmentMode, AssessorResult
@@ -136,6 +137,36 @@ def extract_test_outcome(test: dict[str, Any]) -> FairOutcome:
     return outcome or FairOutcome.indeterminate
 
 
+# Using container version for now instead of the individual test versions, as the latter is not always present in the JSON-LD.
+def _get_version(self, raw: dict) -> str | None:
+    versions = set()
+
+    for item in raw.get("@graph", []):
+        types = item.get("@type", [])
+
+        if isinstance(types, str):
+            types = [types]
+
+        if "ftr:Test" not in types:
+            continue
+
+        version = item.get("dcat:version")
+
+        if isinstance(version, dict):
+            version = version.get("@value")
+
+        if version:
+            versions.add(version)
+
+    if len(versions) == 1:
+        return versions.pop()
+
+    if len(versions) > 1:
+        return ", ".join(sorted(versions))
+
+    return None
+
+
 def _find_outcome(value: Any) -> FairOutcome | None:
     """
     Recursively find a recognised FAIR test outcome in JSON/JSON-LD.
@@ -235,9 +266,16 @@ class FairChampionAssessor(AssessorPlugin):
     async def assess(self, context: AssessmentContext) -> AssessorResult:
         try:
             raw = await self._run_champion_tests(context)
+            version = (
+                self.config.get("version")
+                or os.environ.get("FAIR_CHAMPION_VERSION")
+                or "unknown"
+            )
 
             return AssessorResult(
                 assessor_id=self.assessor_id,
+                # version=_get_version(raw),
+                version=version,
                 name=self.name,
                 status="completed",
                 raw=raw,
