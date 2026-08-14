@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-import shutil
 
 import yaml
 
@@ -10,16 +9,42 @@ ENV_FILE = Path(".env")
 ENV_TEMPLATE = Path("env.template")
 
 
-# Create .env from template if it doesn't exist
-if not ENV_FILE.exists():
+def create_env_from_template():
     if not ENV_TEMPLATE.exists():
         raise FileNotFoundError(f"{ENV_TEMPLATE} does not exist")
 
-    shutil.copyfile(ENV_TEMPLATE, ENV_FILE)
-    print(f"Created {ENV_FILE} from {ENV_TEMPLATE}")
+    output = []
+
+    print(f"{ENV_FILE} does not exist.")
+    print("Review values from env.template (press Enter to accept the default):\n")
+
+    for line in ENV_TEMPLATE.read_text().splitlines():
+        stripped = line.strip()
+
+        # Preserve comments and blank lines
+        if not stripped or stripped.startswith("#") or "=" not in line:
+            output.append(line)
+            continue
+
+        key, default = line.split("=", 1)
+
+        value = input(f"{key} [{default}]: ").strip()
+
+        output.append(f"{key}={value or default}")
+
+    ENV_FILE.write_text("\n".join(output) + "\n")
+
+    print(f"\nCreated {ENV_FILE}")
+
+
+# Create .env interactively if it doesn't exist
+
+if not ENV_FILE.exists():
+    create_env_from_template()
 
 
 # Load assessor configuration
+
 with CONFIG_FILE.open() as f:
     config = yaml.safe_load(f)
 
@@ -33,6 +58,7 @@ versions = {
 
 
 # Update existing .env
+
 lines = ENV_FILE.read_text().splitlines()
 
 updated = set()
@@ -49,10 +75,10 @@ for line in lines:
 
 
 # Append versions missing from .env
+
 for key, value in versions.items():
     if key not in updated:
         output.append(f"{key}={value}")
-
 
 ENV_FILE.write_text("\n".join(output) + "\n")
 

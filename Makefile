@@ -6,8 +6,12 @@ IMAGE_NAME := $(ORG_NAME)/fair-assessment-proxy
 VERSION = $(shell grep '^version' pyproject.toml | head -1 | cut -d '"' -f2)
 PLATFORMS := linux/amd64,linux/arm64
 
-.PHONY: run sync force-sync install git-tag git-push-tag docker-login docker-check-login docker-build docker-push docker-release print-version bump
-run: sync
+.PHONY: run sync force-sync install git-tag git-push-tag docker-login docker-check-login docker-build docker-push docker-release print-version bump run-local
+run:
+	./update_env_file_with_assessor_versions.py
+	docker compose up --build -d
+
+run-local: sync
 	uvicorn src.main:app --host 0.0.0.0 --port $(PORT) --reload
 
 install:
