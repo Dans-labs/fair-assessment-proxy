@@ -43,6 +43,7 @@ print-version:
 	@echo "Version: $(VERSION)"
 
 bump:
+	git pull
 	uv version --bump patch
 	uv lock
 	V=$$(grep '^version' pyproject.toml | head -1 | cut -d '"' -f2); \
