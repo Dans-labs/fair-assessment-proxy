@@ -221,8 +221,8 @@ class AssessmentRequest(BaseModel):
 class AssessorResult(BaseModel):
     assessor_id: str
     name: str
-    version: str
     status: str
+    version: str | None = None
     raw: Any | None = None
     # normalised: dict[str, Any] | None = None
     normalised: NormalizedAssessorResult | None = None

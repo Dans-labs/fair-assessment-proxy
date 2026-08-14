@@ -220,6 +220,8 @@ async def run_assessment(assessment_id: str):
             result = await PLUGINS[assessor_id].assess(context)
             result_data = result.model_dump()
 
+            logger.info(f"Assessment completed for {assessor_id} on {pid}")
+
             await store_assessment_result(
                 assessment_id=assessment_id,
                 pid=pid,

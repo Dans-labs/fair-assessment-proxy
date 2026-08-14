@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 import httpx
 import os
 from collections import defaultdict
@@ -6,6 +7,8 @@ from typing import Any, Iterable
 from fair_assessment_proxy.models import AssessmentMode, AssessorResult
 from fair_assessment_proxy.models import NormalizedAssessorResult, FairOutcome
 from fair_assessment_proxy.plugins.base import AssessmentContext, AssessorPlugin
+
+logger = logging.getLogger(__name__)
 
 TEST_TO_PRINCIPLE = {
     # Findable
