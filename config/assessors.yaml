@@ -3,6 +3,7 @@ assessors:
     enabled: true
     class: "fair_assessment_proxy.plugins.fuji.FujiAssessor"
     name: "F-UJI"
+    version: "latest"
     base_url: "http://fuji:1071/fuji/api/v1"
 
     cached_mode:
@@ -13,6 +14,8 @@ assessors:
     enabled: true
     class: "fair_assessment_proxy.plugins.fair_champion.FairChampionAssessor"
     name: "FAIR Champion"
+    version: "0.5.5"
+    service_version: "1.1.11"
     champion_base_url: "http://fair-champion:4567/champion"
     fair_core_tests_base_url: "http://fair-core-tests:8282/tests"
     metadata_gateway_base_url: "http://metadata-gateway:3000"

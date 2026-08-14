@@ -64,6 +64,7 @@ async def store_assessment_result(
     pid: str,
     mode: str,
     assessor_id: str,
+    version: str,
     raw: dict,
     normalised: dict,
 ):
@@ -73,6 +74,7 @@ async def store_assessment_result(
             doi=pid,
             mode=mode,
             assessor=assessor_id,
+            assessor_version=version,
             raw=raw,
         )
 
@@ -81,6 +83,7 @@ async def store_assessment_result(
             doi=pid,
             mode=mode,
             assessor=assessor_id,
+            assessor_version=version,
             f=normalised["f"],
             f1=normalised["f1"],
             f2=normalised["f2"],
@@ -151,6 +154,7 @@ async def get_assessment_result(
             "raw": raw_record.raw,
             "normalised": {
                 "assessor": assessor_id,
+                "assessor_version": h.assessor_version,
                 "f": h.f,
                 "f1": h.f1,
                 "f2": h.f2,
@@ -216,11 +220,14 @@ async def run_assessment(assessment_id: str):
             result = await PLUGINS[assessor_id].assess(context)
             result_data = result.model_dump()
 
+            logger.info(f"Assessment completed for {assessor_id} on {pid}")
+
             await store_assessment_result(
                 assessment_id=assessment_id,
                 pid=pid,
                 mode=mode,
                 assessor_id=assessor_id,
+                version=result_data["version"],
                 raw=result_data["raw"],
                 normalised=result_data["normalised"],
             )
@@ -232,6 +239,7 @@ async def run_assessment(assessment_id: str):
             }
 
         except Exception as exc:
+            logger.error(f"Assessment failed for {assessor_id} on {pid}: {exc}")
             return {
                 "assessor": assessor_id,
                 "status": "failed",
@@ -373,6 +381,7 @@ async def get_latest_assessment(pid: str):
             "results": [
                 {
                     "assessor": row.assessor,
+                    "assessor_version": row.assessor_version,
                     "f": row.f,
                     "f1": row.f1,
                     "f2": row.f2,
@@ -432,6 +441,7 @@ async def get_assessment_by_id(assessment_id: str):
             "results": [
                 {
                     "assessor": row.assessor,
+                    "assessor_version": row.assessor_version,
                     "f": row.f,
                     "f1": row.f1,
                     "f2": row.f2,
