@@ -50,5 +50,5 @@ curl --location 'localhost:8080/api/v1/assessments/9268ba45-241b-47d5-8e8d-d3218
 
 Get latest report for a PID:
 ```bash
-curl --location 'https://fairproxy-api.eosc-data-commons.dansdemo.nl/api/v1/assessments/latest?pid=https%3A%2F%2Fdoi.org%2F10.1594%2FPANGAEA.908011'
+curl --location 'https://localhost:8080/api/v1/assessments/latest?pid=https%3A%2F%2Fdoi.org%2F10.1594%2FPANGAEA.908011'
 ```
