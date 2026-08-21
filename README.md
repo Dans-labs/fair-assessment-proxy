@@ -7,12 +7,16 @@
 > current development workflow and may change between releases.
 
 ## Quick Start (Development)
+Create `docker-compose.everride.yml` to expose the API on `localhost:8080` and run the assessment proxy:
+```yaml
+services:
+  fair-assessment-proxy:
+    ports:
+      - "8080:8080"
+```
 
 ```bash
-docker compose up --build
-
-# Or with a custom host port (default: 8080)
-FAIR_PROXY_PORT=9090 docker compose up
+make run
 ```
 
 ## Test (Development)
@@ -24,6 +28,7 @@ curl --location 'localhost:8080/api/v1/assessments' \
 --data '{
     "pid": "https://doi.org/10.1594/PANGAEA.908011",
     "mode": "public",
+    "cached": false,
     "assessors": ["fuji", "fair_champion"]
 }'
 ```
@@ -32,11 +37,18 @@ Example output:
 ```bash
 {
     "id": "9268ba45-241b-47d5-8e8d-d32180eccc5b",
-    "status": "completed"
+    "status": "queued",
 }
 ```
+
+## Reports
 
 Get full report:
 ```bash
 curl --location 'localhost:8080/api/v1/assessments/9268ba45-241b-47d5-8e8d-d32180eccc5b'
+```
+
+Get latest report for a PID:
+```bash
+curl --location 'https://fairproxy-api.eosc-data-commons.dansdemo.nl/api/v1/assessments/latest?pid=https%3A%2F%2Fdoi.org%2F10.1594%2FPANGAEA.908011'
 ```

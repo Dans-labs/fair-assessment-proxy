@@ -246,227 +246,227 @@ class FairOutcome(str, enum.Enum):
     not_applicable = "not_applicable"
 
 
-class AssessmentRaw(Base):
-    """
-    Stores the complete untouched response from each backend assessor.
-
-    One row per:
-        assessment_id + assessor
-
-    Example assessors:
-        fuji
-        fair_champion
-    """
-
-    __tablename__ = "assessment_raw"
-
-    id: Mapped[str] = mapped_column(
-        PG_UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid4,
-    )
-
-    assessment_id: Mapped[str] = mapped_column(
-        PG_UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-    )
-
-    doi: Mapped[str] = mapped_column(
-        Text,
-        nullable=False,
-        index=True,
-    )
-
-    assessor: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False,
-        index=True,
-    )
-
-    assessor_name: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-    )
-
-    assessor_version: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-    )
-
-    metric_version: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-    )
-
-    mode: Mapped[AssessmentMode] = mapped_column(
-        SAEnum(AssessmentMode, name="assessment_mode"),
-        nullable=False,
-    )
-
-    status: Mapped[AssessorStatus] = mapped_column(
-        SAEnum(AssessorStatus, name="assessor_status"),
-        nullable=False,
-    )
-
-    timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-
-    started_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
-
-    raw: Mapped[dict[str, Any]] = mapped_column(
-        JSONB,
-        nullable=False,
-    )
-
-    error: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-    )
-
-    __table_args__ = (
-        UniqueConstraint(
-            "assessment_id",
-            "assessor",
-            name="uq_assessment_raw_assessment_assessor",
-        ),
-        Index(
-            "ix_assessment_raw_raw_gin",
-            "raw",
-            postgresql_using="gin",
-        ),
-    )
-
-
-assessment_mode_enum = SAEnum(
-    AssessmentMode,
-    name="assessment_mode",
-    values_callable=lambda enum_cls: [member.value for member in enum_cls],
-)
-
-assessor_status_enum = SAEnum(
-    AssessorStatus,
-    name="assessor_status",
-    values_callable=lambda enum_cls: [member.value for member in enum_cls],
-)
-
-fair_outcome_enum = SAEnum(
-    FairOutcome,
-    name="fair_outcome",
-    values_callable=lambda enum_cls: [member.value for member in enum_cls],
-)
-
-
-class AssessmentNormalized(Base):
-    """
-    Outcome-only FAIR summary.
-
-    One row per:
-        assessment_id + assessor + profile
-    """
-
-    __tablename__ = "assessment_normalized"
-
-    id: Mapped[PG_UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid4,
-    )
-
-    assessment_id: Mapped[PG_UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        nullable=False,
-        index=True,
-    )
-
-    doi: Mapped[str] = mapped_column(
-        Text,
-        nullable=False,
-        index=True,
-    )
-
-    assessor: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False,
-        index=True,
-    )
-
-    profile: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False,
-        default="default",
-    )
-
-    mode: Mapped[AssessmentMode] = mapped_column(
-        assessment_mode_enum,
-        nullable=False,
-    )
-
-    status: Mapped[AssessorStatus] = mapped_column(
-        assessor_status_enum,
-        nullable=False,
-    )
-
-    overall: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-
-    f: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    a: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    i: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    r: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-
-    f1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    f2: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    f3: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    f4: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-
-    a1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    a1_1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    a1_2: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    a2: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-
-    i1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    i2: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    i3: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-
-    r1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    r1_1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    r1_2: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-    r1_3: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
-
-    normalized: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-    )
-
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-
-    __table_args__ = (
-        UniqueConstraint(
-            "assessment_id",
-            "assessor",
-            "profile",
-            name="uq_assessment_normalized_assessment_assessor_profile",
-        ),
-    )
+# class AssessmentRaw(Base):
+#     """
+#     Stores the complete untouched response from each backend assessor.
+#
+#     One row per:
+#         assessment_id + assessor
+#
+#     Example assessors:
+#         fuji
+#         fair_champion
+#     """
+#
+#     __tablename__ = "assessment_raw"
+#
+#     id: Mapped[str] = mapped_column(
+#         PG_UUID(as_uuid=True),
+#         primary_key=True,
+#         default=uuid4,
+#     )
+#
+#     assessment_id: Mapped[str] = mapped_column(
+#         PG_UUID(as_uuid=True),
+#         nullable=False,
+#         index=True,
+#     )
+#
+#     doi: Mapped[str] = mapped_column(
+#         Text,
+#         nullable=False,
+#         index=True,
+#     )
+#
+#     assessor: Mapped[str] = mapped_column(
+#         String(100),
+#         nullable=False,
+#         index=True,
+#     )
+#
+#     assessor_name: Mapped[str | None] = mapped_column(
+#         Text,
+#         nullable=True,
+#     )
+#
+#     assessor_version: Mapped[str | None] = mapped_column(
+#         Text,
+#         nullable=True,
+#     )
+#
+#     metric_version: Mapped[str | None] = mapped_column(
+#         Text,
+#         nullable=True,
+#     )
+#
+#     mode: Mapped[AssessmentMode] = mapped_column(
+#         SAEnum(AssessmentMode, name="assessment_mode"),
+#         nullable=False,
+#     )
+#
+#     status: Mapped[AssessorStatus] = mapped_column(
+#         SAEnum(AssessorStatus, name="assessor_status"),
+#         nullable=False,
+#     )
+#
+#     timestamp: Mapped[datetime] = mapped_column(
+#         DateTime(timezone=True),
+#         server_default=func.now(),
+#         nullable=False,
+#     )
+#
+#     started_at: Mapped[datetime | None] = mapped_column(
+#         DateTime(timezone=True),
+#         nullable=True,
+#     )
+#
+#     completed_at: Mapped[datetime | None] = mapped_column(
+#         DateTime(timezone=True),
+#         nullable=True,
+#     )
+#
+#     raw: Mapped[dict[str, Any]] = mapped_column(
+#         JSONB,
+#         nullable=False,
+#     )
+#
+#     error: Mapped[str | None] = mapped_column(
+#         Text,
+#         nullable=True,
+#     )
+#
+#     __table_args__ = (
+#         UniqueConstraint(
+#             "assessment_id",
+#             "assessor",
+#             name="uq_assessment_raw_assessment_assessor",
+#         ),
+#         Index(
+#             "ix_assessment_raw_raw_gin",
+#             "raw",
+#             postgresql_using="gin",
+#         ),
+#     )
+#
+#
+# assessment_mode_enum = SAEnum(
+#     AssessmentMode,
+#     name="assessment_mode",
+#     values_callable=lambda enum_cls: [member.value for member in enum_cls],
+# )
+#
+# assessor_status_enum = SAEnum(
+#     AssessorStatus,
+#     name="assessor_status",
+#     values_callable=lambda enum_cls: [member.value for member in enum_cls],
+# )
+#
+# fair_outcome_enum = SAEnum(
+#     FairOutcome,
+#     name="fair_outcome",
+#     values_callable=lambda enum_cls: [member.value for member in enum_cls],
+# )
+#
+#
+# class AssessmentNormalized(Base):
+#     """
+#     Outcome-only FAIR summary.
+#
+#     One row per:
+#         assessment_id + assessor + profile
+#     """
+#
+#     __tablename__ = "assessment_normalized"
+#
+#     id: Mapped[PG_UUID] = mapped_column(
+#         PG_UUID(as_uuid=True),
+#         primary_key=True,
+#         default=uuid4,
+#     )
+#
+#     assessment_id: Mapped[PG_UUID] = mapped_column(
+#         PG_UUID(as_uuid=True),
+#         nullable=False,
+#         index=True,
+#     )
+#
+#     doi: Mapped[str] = mapped_column(
+#         Text,
+#         nullable=False,
+#         index=True,
+#     )
+#
+#     assessor: Mapped[str] = mapped_column(
+#         String(100),
+#         nullable=False,
+#         index=True,
+#     )
+#
+#     profile: Mapped[str] = mapped_column(
+#         String(100),
+#         nullable=False,
+#         default="default",
+#     )
+#
+#     mode: Mapped[AssessmentMode] = mapped_column(
+#         assessment_mode_enum,
+#         nullable=False,
+#     )
+#
+#     status: Mapped[AssessorStatus] = mapped_column(
+#         assessor_status_enum,
+#         nullable=False,
+#     )
+#
+#     overall: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#
+#     f: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     a: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     i: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     r: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#
+#     f1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     f2: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     f3: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     f4: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#
+#     a1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     a1_1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     a1_2: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     a2: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#
+#     i1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     i2: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     i3: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#
+#     r1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     r1_1: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     r1_2: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#     r1_3: Mapped[FairOutcome | None] = mapped_column(fair_outcome_enum)
+#
+#     normalized: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+#
+#     created_at: Mapped[datetime] = mapped_column(
+#         DateTime(timezone=True),
+#         server_default=func.now(),
+#         nullable=False,
+#     )
+#
+#     updated_at: Mapped[datetime] = mapped_column(
+#         DateTime(timezone=True),
+#         server_default=func.now(),
+#         onupdate=func.now(),
+#         nullable=False,
+#     )
+#
+#     __table_args__ = (
+#         UniqueConstraint(
+#             "assessment_id",
+#             "assessor",
+#             "profile",
+#             name="uq_assessment_normalized_assessment_assessor_profile",
+#         ),
+#     )
 
 
 class NormalizedAssessorResult(BaseModel):
