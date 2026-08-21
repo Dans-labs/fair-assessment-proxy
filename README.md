@@ -7,7 +7,7 @@
 > current development workflow and may change between releases.
 
 ## Quick Start (Development)
-Create `docker-compose.everride.yml` to expose the API on `localhost:8080` and run the assessment proxy:
+Create `docker-compose.override.yml` to expose the API on `localhost:8080` and run the assessment proxy:
 ```yaml
 services:
   fair-assessment-proxy:
