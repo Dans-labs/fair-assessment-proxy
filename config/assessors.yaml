@@ -14,7 +14,7 @@ assessors:
     enabled: true
     class: "fair_assessment_proxy.plugins.fair_champion.FairChampionAssessor"
     name: "FAIR Champion"
-    version: "0.5.5"
+    version: "0.5.8"
     service_version: "1.1.11"
     champion_base_url: "http://fair-champion:4567/champion"
     fair_core_tests_base_url: "http://fair-core-tests:8282/tests"
