@@ -52,3 +52,7 @@ Get latest report for a PID:
 ```bash
 curl --location 'https://localhost:8080/api/v1/assessments/latest?pid=https%3A%2F%2Fdoi.org%2F10.1594%2FPANGAEA.908011'
 ```
+
+## API Documentation
+
+openAPI documentation is available at `localhost:8080/api/v1/docs` when the proxy is running.
