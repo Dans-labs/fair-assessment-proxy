@@ -7,6 +7,7 @@ from typing import Any, Iterable
 from fair_assessment_proxy.models import AssessmentMode, AssessorResult
 from fair_assessment_proxy.models import NormalizedAssessorResult, FairOutcome
 from fair_assessment_proxy.plugins.base import AssessmentContext, AssessorPlugin
+from fair_assessment_proxy.reporting import outcome_value
 
 logger = logging.getLogger(__name__)
 
@@ -254,6 +255,63 @@ def _parse_outcome_value(value: Any) -> FairOutcome | None:
     }
 
     return aliases.get(normalized)
+
+
+def _jsonld_value(value):
+    if isinstance(value, dict):
+        return value.get("@value")
+    return value
+
+
+def _node_types(node):
+    types = node.get("@type", [])
+    return [types] if isinstance(types, str) else types
+
+
+def _node_with_type(payload, node_type):
+    return next(
+        (
+            node
+            for node in payload.get("@graph", [])
+            if node_type in _node_types(node)
+        ),
+        {},
+    )
+
+
+def guidance_for(raw):
+    entries = []
+
+    for test in raw.get("tests") or []:
+        test_id = test.get("test_id") or ""
+        payload = test.get("raw") or {}
+        result = _node_with_type(payload, "ftr:TestResult")
+        definition = _node_with_type(payload, "ftr:Test")
+        outcome = outcome_value(
+            _jsonld_value(result.get("prov:value"))
+            or extract_test_outcome(test).value
+        )
+        message = _jsonld_value(result.get("ftr:log")) or test.get("error")
+
+        if not message and outcome in {"fail", "partial"}:
+            message = f"Test reported {outcome}"
+
+        entries.append(
+            {
+                "assessor": "fair_champion",
+                "cell": TEST_TO_PRINCIPLE_FULL.get(test_id),
+                "test": test_id,
+                "description": _jsonld_value(
+                    result.get("dct:description")
+                    or definition.get("dct:description")
+                ),
+                "outcome": outcome,
+                "message": message,
+                "guidance": None,
+            }
+        )
+
+    return entries
 
 
 def pid_to_doi(pid: str) -> str:
