@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Any
 
 import httpx
@@ -6,6 +7,81 @@ import httpx
 from fair_assessment_proxy.models import AssessmentMode, AssessorResult
 from fair_assessment_proxy.plugins.base import AssessmentContext, AssessorPlugin
 from fair_assessment_proxy.models import NormalizedAssessorResult, FairOutcome
+
+
+METRIC_PATTERN = re.compile(r"^FsF-([FAIR]\d(?:\.\d)?)-")
+
+
+def cell_for(metric_identifier):
+    match = METRIC_PATTERN.match(metric_identifier or "")
+    return match.group(1).lower().replace(".", "_") if match else None
+
+
+def outcome_of(result):
+    status = str(result.get("test_status", "")).strip().lower()
+
+    if status not in {"pass", "partial", "fail"}:
+        return "unmeasured"
+    if status == "fail":
+        return "fail"
+
+    score = result.get("score") or {}
+
+    try:
+        earned = float(score["earned"])
+        total = float(score["total"])
+    except (KeyError, TypeError, ValueError):
+        return "partial" if status == "partial" else "pass"
+
+    if total <= 0:
+        return "unmeasured"
+    if earned <= 0:
+        return "fail"
+    return "pass" if earned >= total else "partial"
+
+
+def guidance_for(raw):
+    entries = []
+
+    for result in raw.get("results") or []:
+        outcome = outcome_of(result)
+        reasons = []
+
+        if outcome in {"fail", "partial"}:
+            reasons.extend(
+                str(test.get("metric_test_name") or "Failed metric test")
+                for test in (result.get("metric_tests") or {}).values()
+                if test.get("metric_test_status") == "fail"
+            )
+            reasons.extend(
+                str(message).split(": ", maxsplit=1)[-1]
+                for message in result.get("test_debug") or []
+                if str(message).startswith(("WARNING:", "ERROR:", "FAILURE:"))
+            )
+
+            if not reasons:
+                score = result.get("score") or {}
+                earned = score.get("earned")
+                total = score.get("total")
+                reasons.append(
+                    f"Earned {earned} of {total} points"
+                    if earned is not None and total is not None
+                    else f"Metric reported {outcome}"
+                )
+
+        entries.append(
+            {
+                "assessor": "fuji",
+                "cell": cell_for(result.get("metric_identifier") or ""),
+                "test": result.get("metric_identifier"),
+                "description": result.get("metric_name"),
+                "outcome": outcome,
+                "message": "; ".join(dict.fromkeys(reasons)) or None,
+                "guidance": None,
+            }
+        )
+
+    return entries
 
 
 class FujiAssessor(AssessorPlugin):
