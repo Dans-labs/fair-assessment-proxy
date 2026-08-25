@@ -17,6 +17,16 @@ from fair_assessment_proxy.models import (
 from fair_assessment_proxy.db import AsyncSessionLocal
 from fair_assessment_proxy.plugin_loader import load_assessor_plugins
 from fair_assessment_proxy.plugins.base import AssessmentContext
+from fair_assessment_proxy.plugins.fair_champion import (
+    guidance_for as champion_guidance,
+)
+from fair_assessment_proxy.plugins.fuji import guidance_for as fuji_guidance
+from fair_assessment_proxy.reporting import (
+    CELLS,
+    cells_for,
+    combine,
+    serialize_result,
+)
 
 PLUGINS = load_assessor_plugins()
 ASSESSMENTS: dict[str, dict[str, Any]] = {}
@@ -404,6 +414,120 @@ async def get_latest_assessment(pid: str):
                 }
                 for row in rows
             ],
+        }
+
+
+async def load_assessment(db, assessment_id):
+    assessment = await db.get(Assessment, assessment_id)
+
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+
+    return assessment
+
+
+@router.get("/{assessment_id}/results", tags=["Assessments"])
+async def get_results(assessment_id: str):
+    async with AsyncSessionLocal() as db:
+        assessment = await load_assessment(db, assessment_id)
+        rows = (
+            await db.execute(
+                select(HarmonizedAssessment)
+                .where(HarmonizedAssessment.assessment_id == assessment_id)
+                .order_by(HarmonizedAssessment.assessor)
+            )
+        ).scalars().all()
+
+        return {
+            "id": assessment.id,
+            "pid": assessment.pid,
+            "status": assessment.status,
+            "results": [serialize_result(row) for row in rows],
+        }
+
+
+@router.get("/{assessment_id}/results/{assessor}", tags=["Assessments"])
+async def get_result_for_assessor(assessment_id: str, assessor: str):
+    async with AsyncSessionLocal() as db:
+        await load_assessment(db, assessment_id)
+        row = (
+            await db.execute(
+                select(HarmonizedAssessment).where(
+                    HarmonizedAssessment.assessment_id == assessment_id,
+                    HarmonizedAssessment.assessor == assessor,
+                )
+            )
+        ).scalar_one_or_none()
+
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No result for assessor: {assessor}",
+            )
+
+        raw = (
+            await db.execute(
+                select(RawAssessment).where(
+                    RawAssessment.assessment_id == assessment_id,
+                    RawAssessment.assessor == assessor,
+                )
+            )
+        ).scalar_one_or_none()
+
+        return serialize_result(row, raw.raw if raw else None)
+
+
+@router.get("/{assessment_id}/report", tags=["Assessments"])
+async def get_report(assessment_id: str):
+    async with AsyncSessionLocal() as db:
+        assessment = await load_assessment(db, assessment_id)
+        rows = (
+            await db.execute(
+                select(HarmonizedAssessment).where(
+                    HarmonizedAssessment.assessment_id == assessment_id
+                )
+            )
+        ).scalars().all()
+        raw_rows = (
+            await db.execute(
+                select(RawAssessment).where(
+                    RawAssessment.assessment_id == assessment_id
+                )
+            )
+        ).scalars().all()
+
+        grids = {row.assessor: cells_for(row) for row in rows}
+        cells = []
+
+        for cell in CELLS:
+            by_assessor = {
+                assessor: grid[cell] for assessor, grid in grids.items()
+            }
+            cells.append(
+                {
+                    "cell": cell,
+                    "consensus": combine(list(by_assessor.values())),
+                    "by_assessor": by_assessor,
+                }
+            )
+
+        guidance = []
+
+        for raw_row in raw_rows:
+            if raw_row.assessor == "fair_champion":
+                guidance.extend(champion_guidance(raw_row.raw))
+            elif raw_row.assessor == "fuji":
+                guidance.extend(fuji_guidance(raw_row.raw))
+
+        return {
+            "id": assessment.id,
+            "pid": assessment.pid,
+            "status": assessment.status,
+            "cells": cells,
+            "scores": {
+                row.assessor: serialize_result(row)["scores"] for row in rows
+            },
+            "guidance": guidance,
         }
 
 
