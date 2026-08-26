@@ -24,6 +24,10 @@ PRINCIPLE_CELLS = {
 }
 
 DERIVED = {"a1", "r1"}
+PARENTS = {
+    "a1": ("a1_1", "a1_2"),
+    "r1": ("r1_1", "r1_2", "r1_3"),
+}
 POINTS = {"pass": 100.0, "partial": 50.0, "fail": 0.0}
 _RAW_MISSING = object()
 
@@ -34,7 +38,12 @@ def outcome_value(value):
 
 
 def cells_for(row):
-    return {cell: outcome_value(getattr(row, cell)) for cell in CELLS}
+    cells = {cell: outcome_value(getattr(row, cell)) for cell in CELLS}
+
+    for parent, refinements in PARENTS.items():
+        cells[parent] = combine([cells[cell] for cell in refinements])
+
+    return cells
 
 
 def scores_for(cells):
