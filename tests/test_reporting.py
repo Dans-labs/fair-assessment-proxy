@@ -27,3 +27,27 @@ class ReportingTest(TestCase):
         self.assertEqual("fail", combine(["pass", "fail"]))
         self.assertEqual("partial", combine(["pass", "partial"]))
         self.assertEqual("unmeasured", combine(["unmeasured"]))
+
+    def test_derives_parent_cells_instead_of_trusting_legacy_columns(self):
+        values = dict.fromkeys(CELLS, "unmeasured")
+        values.update(
+            {
+                "a1": "fail",
+                "a1_1": "pass",
+                "a1_2": "pass",
+                "a2": "fail",
+                "r1": "pass",
+                "r1_1": "pass",
+                "r1_2": "partial",
+            }
+        )
+        row = SimpleNamespace(
+            assessor="fair_champion",
+            assessor_version="0.5.8",
+            **values,
+        )
+
+        result = serialize_result(row)
+
+        self.assertEqual("pass", result["cells"]["a1"])
+        self.assertEqual("partial", result["cells"]["r1"])
