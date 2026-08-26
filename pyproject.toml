@@ -4,6 +4,25 @@ version = "0.0.3"
 description = "A proxy service for the FAIR Assessment Tool Registry API"
 readme = "README.md"
 requires-python = ">=3.12.8"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Data Archiving and Networked Services (DANS)" },
+]
+maintainers = [
+    { name = "Reggie Cushing", email = "reggie.cushing@dans.knaw.nl" },
+    { name = "Laurens Tobias", email = "laurens.tobias@dans.knaw.nl" },
+]
+keywords = ["EOSC", "FAIR", "FAIR assessment", "research data"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: FastAPI",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
 dependencies = [
     "cryptography>=46.0.5",
     "dynaconf>=3.2.12",
@@ -18,3 +37,10 @@ dependencies = [
     "uvicorn>=0.40.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Dans-labs/fair-assessment-proxy"
+Documentation = "https://fairproxy-api.eosc-data-commons.dansdemo.nl/docs#/"
+Repository = "https://github.com/Dans-labs/fair-assessment-proxy"
+Issues = "https://github.com/Dans-labs/fair-assessment-proxy/issues"
+"EOSC Data Commons" = "https://www.eosc-data-commons.eu/"
+"EOSC Data Commons grant" = "https://doi.org/10.3030/101188179"
