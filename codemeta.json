@@ -1,0 +1,67 @@
+{
+  "@context": "https://w3id.org/codemeta/3.0",
+  "@type": "SoftwareSourceCode",
+  "name": "FAIR Assessment Proxy",
+  "identifier": "https://github.com/Dans-labs/fair-assessment-proxy",
+  "description": "A proxy service for the FAIR Assessment Tool Registry API.",
+  "version": "0.0.3",
+  "codeRepository": "https://github.com/Dans-labs/fair-assessment-proxy",
+  "issueTracker": "https://github.com/Dans-labs/fair-assessment-proxy/issues",
+  "license": "https://spdx.org/licenses/Apache-2.0",
+  "developmentStatus": "https://www.repostatus.org/#wip",
+  "programmingLanguage": {
+    "@type": "schema:ComputerLanguage",
+    "name": "Python",
+    "url": "https://www.python.org/"
+  },
+  "runtimePlatform": "Python >=3.12.8",
+  "operatingSystem": "Platform Independent",
+  "keywords": [
+    "EOSC",
+    "FAIR",
+    "FAIR assessment",
+    "research data"
+  ],
+  "author": {
+    "@type": "Organization",
+    "name": "Data Archiving and Networked Services (DANS)",
+    "url": "https://dans.knaw.nl/"
+  },
+  "maintainer": [
+    {
+      "@type": "Person",
+      "givenName": "Reggie",
+      "familyName": "Cushing",
+      "email": "mailto:reggie.cushing@dans.knaw.nl",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "Data Archiving and Networked Services (DANS)",
+        "url": "https://dans.knaw.nl/"
+      }
+    },
+    {
+      "@type": "Person",
+      "givenName": "Laurens",
+      "familyName": "Tobias",
+      "email": "mailto:laurens.tobias@dans.knaw.nl",
+      "affiliation": {
+        "@type": "Organization",
+        "name": "Data Archiving and Networked Services (DANS)",
+        "url": "https://dans.knaw.nl/"
+      }
+    }
+  ],
+  "isPartOf": {
+    "@id": "https://doi.org/10.3030/101188179",
+    "@type": "schema:Project",
+    "name": "EOSC Data Commons",
+    "url": "https://www.eosc-data-commons.eu/",
+    "identifier": "https://doi.org/10.3030/101188179"
+  },
+  "funding": "European Union Grant Agreement No. 101188179",
+  "funder": {
+    "@type": "Organization",
+    "name": "European Union",
+    "url": "https://european-union.europa.eu/"
+  }
+}
