@@ -14,6 +14,7 @@ from fair_assessment_proxy.models import (
     HarmonizedAssessment,
     Assessment,
 )
+from fair_assessment_proxy.offline import assess_metadata
 from fair_assessment_proxy.db import AsyncSessionLocal
 from fair_assessment_proxy.plugin_loader import load_assessor_plugins
 from fair_assessment_proxy.plugins.base import AssessmentContext
@@ -66,6 +67,10 @@ def normalize_pid(pid: str) -> str:
 class AssessmentCreated(BaseModel):
     id: str
     status: str
+
+
+class OfflineAssessmentRequest(BaseModel):
+    metadata: dict[str, Any]
 
 
 async def store_assessment_result(
@@ -349,6 +354,11 @@ async def create_assessment(req: AssessmentRequest):
         id=assessment_id,
         status="queued",
     )
+
+
+@router.post("/offline", tags=["Assessments"])
+async def create_offline_assessment(req: OfflineAssessmentRequest):
+    return assess_metadata(req.metadata)
 
 
 @router.get("/latest", tags=["Assessments"])
