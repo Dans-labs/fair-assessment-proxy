@@ -41,6 +41,47 @@ Example output:
 }
 ```
 
+## Offline Assessment
+
+Metadata can be assessed without resolving a PID or contacting an external
+assessor. The endpoint accepts a JSON object and returns its result immediately;
+offline assessments are not stored in the database.
+
+```bash
+curl --location 'localhost:8080/api/v1/assessments/offline' \
+--header 'Content-Type: application/json' \
+--data '{
+  "metadata": {
+    "@context": "https://schema.org/",
+    "@type": "Dataset",
+    "@id": "https://doi.org/10.1234/example",
+    "name": "Example dataset",
+    "description": "Example metadata for an offline FAIR assessment.",
+    "creator": {"name": "Ada Example"},
+    "publisher": {"name": "DANS"},
+    "datePublished": "2026-08-24",
+    "keywords": ["FAIR"],
+    "license": "https://creativecommons.org/licenses/by/4.0/",
+    "citation": "https://doi.org/10.1234/related",
+    "conformsTo": "https://schema.org/Dataset"
+  }
+}'
+```
+
+The same assessment is available as a Python function:
+
+```python
+from fair_assessment_proxy.offline import assess_metadata
+
+result = assess_metadata(metadata)
+```
+
+The offline assessor evaluates F1, F2, F3, I1, I3, R1.1, R1.2, and R1.3.
+F4, I2, A1.1, A1.2, and A2 are reported as `unmeasured` because they require
+search, vocabulary, protocol, authorization, or persistence checks outside the
+supplied metadata. JSON-LD objects and DataCite JSON API `data.attributes`
+responses are supported.
+
 ## Reports
 
 Get full report:
