@@ -105,7 +105,7 @@ async def store_assessment_result(
             f3=normalised["f3"],
             f4=normalised["f4"],
             a=normalised["a"],
-            a1=normalised["a"],
+            a1=normalised["a1"],
             a1_1=normalised["a1_1"],
             a1_2=normalised["a1_2"],
             a2=normalised["a2"],
@@ -250,6 +250,16 @@ async def run_assessment(assessment_id: str):
                 )
 
                 if stored_result is not None:
+                    normalised = stored_result["normalised"]
+                    await store_assessment_result(
+                        assessment_id=assessment_id,
+                        pid=pid,
+                        mode=mode,
+                        assessor_id=assessor_id,
+                        version=normalised["assessor_version"],
+                        raw=stored_result["raw"],
+                        normalised=normalised,
+                    )
                     return {
                         "assessor": assessor_id,
                         "status": "completed",
