@@ -126,6 +126,30 @@ async def store_assessment_result(
         await db.commit()
 
 
+async def store_assessment_failure(
+    *,
+    assessment_id: str,
+    pid: str,
+    mode: str,
+    assessor_id: str,
+    version: str | None,
+    error: str,
+):
+    async with AsyncSessionLocal() as db:
+        db.add(
+            RawAssessment(
+                assessment_id=assessment_id,
+                doi=pid,
+                mode=mode,
+                assessor=assessor_id,
+                assessor_version=version or "unknown",
+                raw={"status": "failed", "error": error},
+            )
+        )
+
+        await db.commit()
+
+
 async def get_assessment_result(
     *,
     pid: str,
@@ -235,6 +259,26 @@ async def run_assessment(assessment_id: str):
             result = await PLUGINS[assessor_id].assess(context)
             result_data = result.model_dump()
 
+            if result_data["status"] == "failed":
+                error = result_data["error"]
+                if error is None:
+                    error = "Assessor failed without an error message"
+                await store_assessment_failure(
+                    assessment_id=assessment_id,
+                    pid=pid,
+                    mode=mode,
+                    assessor_id=assessor_id,
+                    version=result_data["version"],
+                    error=error,
+                )
+                logger.error(f"Assessment failed for {assessor_id} on {pid}: {error}")
+                return {
+                    "assessor": assessor_id,
+                    "status": "failed",
+                    "cached": False,
+                    "error": error,
+                }
+
             logger.info(f"Assessment completed for {assessor_id} on {pid}")
 
             await store_assessment_result(
@@ -254,12 +298,28 @@ async def run_assessment(assessment_id: str):
             }
 
         except Exception as exc:
-            logger.error(f"Assessment failed for {assessor_id} on {pid}: {exc}")
+            error = str(exc)
+            logger.error(f"Assessment failed for {assessor_id} on {pid}: {error}")
+
+            try:
+                await store_assessment_failure(
+                    assessment_id=assessment_id,
+                    pid=pid,
+                    mode=mode,
+                    assessor_id=assessor_id,
+                    version=None,
+                    error=error,
+                )
+            except Exception:
+                logger.exception(
+                    f"Could not persist failure for {assessor_id} on {pid}"
+                )
+
             return {
                 "assessor": assessor_id,
                 "status": "failed",
                 "cached": False,
-                "error": str(exc),
+                "error": error,
             }
 
     results = await asyncio.gather(
