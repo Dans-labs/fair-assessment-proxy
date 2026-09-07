@@ -8,6 +8,46 @@ except ModuleNotFoundError:
 
 
 class OfflineAssessmentTest(TestCase):
+    def test_licence_text_without_a_web_url_is_only_partial(self):
+        for licence, expected in (
+            ("banana", "partial"),
+            ("MIT", "partial"),
+            ("CC-BY-4.0", "partial"),
+            ("https://creativecommons.org/licenses/by/4.0/", "pass"),
+            ("https://[bad", "partial"),
+            ("https://not a host/licence", "partial"),
+            ("https://example.org:notaport/licence", "partial"),
+            ("https://example.org:99999/licence", "partial"),
+            (None, "fail"),
+        ):
+            with self.subTest(licence=licence):
+                result = assess_metadata({"license": licence})
+                self.assertEqual(expected, result["cells"]["r1_1"])
+
+    def test_graph_dataset_inherits_context_without_overriding_its_own(self):
+        for local_context, expected in (
+            ({}, "pass"),
+            ({"@context": None}, "partial"),
+        ):
+            with self.subTest(local_context=local_context):
+                metadata = {
+                    "@context": "https://schema.org/",
+                    "@graph": [
+                        {"@type": "Person", "name": "Ada Example"},
+                        {
+                            "@type": "Dataset",
+                            "name": "Unpublished draft",
+                            **local_context,
+                        },
+                    ],
+                }
+                original = deepcopy(metadata)
+
+                result = assess_metadata(metadata)
+
+                self.assertEqual(expected, result["cells"]["i1"])
+                self.assertEqual(original, metadata)
+
     def test_assesses_locally_observable_jsonld_metadata(self):
         self.assertIsNotNone(assess_metadata, "offline assessor is not implemented")
         metadata = {
