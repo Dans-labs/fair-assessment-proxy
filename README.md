@@ -43,12 +43,9 @@ Example output:
 
 ## Offline Assessment
 
-Metadata can be assessed without resolving a PID or contacting an external
-assessor. The endpoint accepts a JSON object and returns its result immediately;
-offline assessments are not stored in the database.
-
-Unpublished datasets do not need a DOI or public URL. Missing identifiers fail
-the F1 and F3 checks but do not prevent the remaining metadata checks from running.
+Submit JSON-LD or DataCite JSON API `data.attributes` metadata for an initial
+assessment of an unpublished dataset. No DOI or public URL is required. Checks
+run locally, and results are returned immediately without being stored.
 
 ```bash
 curl --location 'localhost:8080/api/v1/assessments/offline' \
@@ -77,19 +74,9 @@ from fair_assessment_proxy.offline import assess_metadata
 result = assess_metadata(metadata)
 ```
 
-The offline assessor evaluates F1, F2, F3, I1, I3, R1.1, R1.2, and R1.3.
-F4, I2, A1.1, A1.2, and A2 are reported as `unmeasured` because they require
-search, vocabulary, protocol, authorization, or persistence checks outside the
-supplied metadata. JSON-LD objects and DataCite JSON API `data.attributes`
-responses are supported.
-
-These are initial metadata checks, not a full schema validation or proof of FAIR
-compliance. The licence check reports `pass` when an HTTP(S) URL passes basic
-syntax checks, without retrieving or validating its contents. Licence text or a short identifier
-such as `CC-BY-4.0` without a URL is `partial`; missing licence information is `fail`.
-Unparseable URL identifiers do not stop the assessment or pass the global-identifier
-check. JSON-LD graph nodes inherit the document context unless they declare their
-own; this is not a full JSON-LD processor.
+The assessor checks F1, F2, F3, I1, I3, R1.1, R1.2, and R1.3 using the supplied
+metadata. F4, I2, A1.1, A1.2, and A2 remain `unmeasured` because they need external
+evidence. Missing identifiers fail F1 and F3; the other checks still run.
 
 ## Reports
 
