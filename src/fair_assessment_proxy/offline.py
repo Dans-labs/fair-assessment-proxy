@@ -109,12 +109,17 @@ def _root(metadata: dict[str, Any]) -> dict[str, Any]:
     graph = metadata.get("@graph")
     if isinstance(graph, list):
         nodes = [node for node in graph if isinstance(node, dict)]
-        for node in nodes:
-            types = _texts(node.get("@type"))
-            if any("dataset" in value.casefold() for value in types):
-                return node
         if nodes:
-            return nodes[0]
+            root = nodes[0]
+            for node in nodes:
+                types = _texts(node.get("@type"))
+                if any("dataset" in value.casefold() for value in types):
+                    root = node
+                    break
+            root = dict(root)
+            if "@context" not in root and "@context" in metadata:
+                root["@context"] = metadata["@context"]
+            return root
 
     return metadata
 
@@ -158,6 +163,18 @@ def _field_texts(root: dict[str, Any], field: str) -> list[str]:
     return [text for value in _values(root, field) for text in _texts(value)]
 
 
+def _http_url(value: str) -> bool:
+    candidate = value.strip()
+    if any(character.isspace() for character in candidate):
+        return False
+    try:
+        parsed = urlparse(candidate)
+        _ = parsed.port  # Accessing the property validates the port.
+        return parsed.scheme in {"http", "https"} and bool(parsed.hostname)
+    except ValueError:
+        return False
+
+
 def _global_identifier(value: str) -> bool:
     candidate = value.strip()
     lowered = candidate.casefold()
@@ -165,8 +182,7 @@ def _global_identifier(value: str) -> bool:
         return True
     if lowered.startswith(("ark:/", "hdl:", "urn:", "uuid:")):
         return True
-    parsed = urlparse(candidate)
-    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+    return _http_url(candidate)
 
 
 def _richness(root: dict[str, Any]) -> tuple[str, str]:
@@ -219,9 +235,9 @@ def _license(root: dict[str, Any]) -> tuple[str, str]:
     values = _field_texts(root, "license")
     if not values:
         return "fail", "No licence information was found."
-    if any(_global_identifier(value) or re.fullmatch(r"[A-Za-z0-9-.+]+", value) for value in values):
-        return "pass", "Found machine-actionable licence information."
-    return "partial", "Licence text is present without a URI or identifier."
+    if any(_http_url(value) for value in values):
+        return "pass", "Found a licence URL; its contents were not verified offline."
+    return "partial", "Licence text is present without a parseable HTTP(S) URL."
 
 
 def _provenance(root: dict[str, Any]) -> tuple[str, str]:
