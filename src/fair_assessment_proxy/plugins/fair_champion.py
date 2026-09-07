@@ -1,35 +1,20 @@
 from __future__ import annotations
-import logging
-import httpx
+
 import os
+import re
 from collections import defaultdict
 from typing import Any, Iterable
+
+import httpx
+
 from fair_assessment_proxy.models import AssessmentMode, AssessorResult
 from fair_assessment_proxy.models import NormalizedAssessorResult, FairOutcome
 from fair_assessment_proxy.plugins.base import AssessmentContext, AssessorPlugin
-from fair_assessment_proxy.reporting import outcome_value
+from fair_assessment_proxy.reporting import CELLS, outcome_value
 
-logger = logging.getLogger(__name__)
+METRIC_PATTERN = re.compile(r"FM_([A-Z]\d(?:_\d)?)_M_")
 
-TEST_TO_PRINCIPLE = {
-    # Findable
-    "test_FM_F1_M_IdentUnique": "f1",
-    "fc_structured_metadata": "f2",
-    "test_FM_F3_M_MetaIdent": "f3",
-    "fc_searchable": "f4",
-    # Accessible
-    "test_FM_A1_1_M_OpenProt": "a1_1",
-    "test_FM_A1_2_M_Auth": "a1_2",
-    "test_FM_A2_M_MetaLong": "a2",
-    # Interoperable
-    "test_FM_I1_M_FormalLangSyntax": "i1",
-    "fc_metadata_uses_fair_vocabularies": "i2",
-    "test_FM_I3_M_QualRef": "i3",
-    # Reusable
-    "test_FM_R1_1_M_StdLic": "r1_1",
-}
-
-TEST_TO_PRINCIPLE_FULL = {
+LEGACY_TEST_TO_PRINCIPLE = {
     # Findable
     "fc_unique_identifier": "f1",
     "test_FM_F1_M_IdentUnique": "f1",
@@ -71,6 +56,16 @@ TEST_TO_PRINCIPLE_FULL = {
     "test_FM_R1_1_M_StdLic": "r1_1",
     "test_FM_R1_1_M_StdLic_strong": "r1_1",
 }
+
+
+def cell_for(test_id):
+    match = METRIC_PATTERN.search(test_id or "")
+
+    if match is None:
+        return None
+
+    cell = match.group(1).lower()
+    return cell if cell in CELLS else None
 
 
 def combine_outcomes(
@@ -139,36 +134,6 @@ def extract_test_outcome(test: dict[str, Any]) -> FairOutcome:
     outcome = _find_outcome(result)
 
     return outcome or FairOutcome.indeterminate
-
-
-# Using container version for now instead of the individual test versions, as the latter is not always present in the JSON-LD.
-def _get_version(self, raw: dict) -> str | None:
-    versions = set()
-
-    for item in raw.get("@graph", []):
-        types = item.get("@type", [])
-
-        if isinstance(types, str):
-            types = [types]
-
-        if "ftr:Test" not in types:
-            continue
-
-        version = item.get("dcat:version")
-
-        if isinstance(version, dict):
-            version = version.get("@value")
-
-        if version:
-            versions.add(version)
-
-    if len(versions) == 1:
-        return versions.pop()
-
-    if len(versions) > 1:
-        return ", ".join(sorted(versions))
-
-    return None
 
 
 def _find_outcome(value: Any) -> FairOutcome | None:
@@ -280,6 +245,9 @@ def _node_with_type(payload, node_type):
 
 
 def guidance_for(raw):
+    if "test_results" in raw:
+        return _algorithm_guidance_for(raw)
+
     entries = []
 
     for test in raw.get("tests") or []:
@@ -299,7 +267,7 @@ def guidance_for(raw):
         entries.append(
             {
                 "assessor": "fair_champion",
-                "cell": TEST_TO_PRINCIPLE_FULL.get(test_id),
+                "cell": LEGACY_TEST_TO_PRINCIPLE.get(test_id),
                 "test": test_id,
                 "description": _jsonld_value(
                     result.get("dct:description")
@@ -308,6 +276,45 @@ def guidance_for(raw):
                 "outcome": outcome,
                 "message": message,
                 "guidance": None,
+            }
+        )
+
+    return entries
+
+
+def _guidance_text(value):
+    if isinstance(value, list):
+        values = [item for item in value if item]
+        return values or None
+
+    return value or None
+
+
+def _algorithm_guidance_for(raw):
+    tests = raw.get("tests") or []
+    conditions = raw.get("conditions") or []
+    narratives = raw.get("narratives") or []
+    guidances = raw.get("guidances") or []
+    results = raw.get("test_results") or {}
+    entries = []
+
+    for index, test in enumerate(tests):
+        reference = test.get("reference")
+        condition = conditions[index] if index < len(conditions) else {}
+        guidance = (
+            guidances[index]
+            if index < len(guidances)
+            else condition.get("guidance")
+        )
+        entries.append(
+            {
+                "assessor": "fair_champion",
+                "cell": cell_for(test.get("testid") or ""),
+                "test": reference,
+                "description": condition.get("description"),
+                "outcome": (results.get(reference) or {}).get("result"),
+                "message": narratives[index] if index < len(narratives) else None,
+                "guidance": _guidance_text(guidance),
             }
         )
 
@@ -326,7 +333,7 @@ def pid_to_doi(pid: str) -> str:
 class FairChampionAssessor(AssessorPlugin):
     async def assess(self, context: AssessmentContext) -> AssessorResult:
         try:
-            raw = await self._run_champion_tests(context)
+            raw = await self._run_algorithm(context)
             version = (
                 self.config.get("version")
                 or os.environ.get("FAIR_CHAMPION_VERSION")
@@ -335,7 +342,6 @@ class FairChampionAssessor(AssessorPlugin):
 
             return AssessorResult(
                 assessor_id=self.assessor_id,
-                # version=_get_version(raw),
                 version=version,
                 name=self.name,
                 status="completed",
@@ -351,89 +357,31 @@ class FairChampionAssessor(AssessorPlugin):
                 error=str(exc),
             )
 
-    async def _run_champion_tests(
+    async def _run_algorithm(
         self,
         context: AssessmentContext,
     ) -> dict[str, Any]:
-        champion_base_url = self.config["champion_base_url"].rstrip("/")
-        fair_core_tests_base_url = self.config["fair_core_tests_base_url"].rstrip("/")
-
-        proxy_url = f"{champion_base_url}/test-execution-proxy"
-
-        resource_identifier = self._resource_identifier(context)
-        # test_ids = self.config.get("tests", [])
-        test_ids = list(TEST_TO_PRINCIPLE.keys())
-
-        results = []
+        base_url = self.config["champion_base_url"].rstrip("/")
+        algorithm = self.config["algorithm"]
+        url = f"{base_url}/assess/algorithm/d/{algorithm}"
 
         async with httpx.AsyncClient(timeout=180.0) as client:
-            for test_id in test_ids:
-                print(
-                    f"Running FAIR Champion test: {test_id} for resource: {resource_identifier}"
-                )
-                test_endpoint = f"{fair_core_tests_base_url}/assess/test/{test_id}"
-                print(f"Test endpoint: {test_endpoint}")
+            response = await client.post(
+                url,
+                json={"guid": self._resource_identifier(context)},
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            )
 
-                # response = await client.post(
-                #     proxy_url,
-                #     data={
-                #         "endpoint": test_endpoint,
-                #         "resource_identifier": resource_identifier,
-                #     },
-                #     headers={
-                #         "Accept": "application/ld+json",
-                #     },
-                # )
-                response = await client.post(
-                    test_endpoint,
-                    data={
-                        "resource_identifier": resource_identifier,
-                    },
-                    headers={
-                        "Accept": "application/ld+json",
-                    },
-                )
-                print(f"Response status code: {response.status_code}")
-                # print(
-                #     response.json()
-                #     if response.headers.get("content-type") == "application/json"
-                #     else response.text
-                # )
-                # break
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"FAIR Champion returned HTTP {response.status_code}: "
+                f"{response.text[:1000]}"
+            )
 
-                if response.status_code >= 400:
-                    results.append(
-                        {
-                            "test_id": test_id,
-                            "status": "failed",
-                            "error": response.text[:1000],
-                        }
-                    )
-                    continue
-
-                try:
-                    body = response.json()
-                except Exception:
-                    print(
-                        f"Failed to parse JSON response for test {test_id}. Falling back to raw text"
-                    )
-                    body = {
-                        "content_type": response.headers.get("content-type"),
-                        "body": response.text,
-                    }
-
-                results.append(
-                    {
-                        "test_id": test_id,
-                        "status": "completed",
-                        "raw": body,
-                    }
-                )
-
-        return {
-            "resource_identifier": resource_identifier,
-            "tests": results,
-        }
+        return response.json()
 
     def _resource_identifier(self, context: AssessmentContext) -> str:
         if context.mode == AssessmentMode.public:
@@ -444,62 +392,6 @@ class FairChampionAssessor(AssessorPlugin):
 
         return f"{gateway}/resource/doi/{doi}"
 
-    def _normalize(self, raw: dict[str, Any]) -> dict[str, Any]:
-        tests = raw.get("tests", [])
-
-        total = len(tests)
-        completed = len([t for t in tests if t.get("status") == "completed"])
-        failed_to_run = len([t for t in tests if t.get("status") == "failed"])
-
-        test_summaries = []
-
-        for test in tests:
-            outcome = self._extract_outcome(test)
-
-            test_summaries.append(
-                {
-                    "test_id": test.get("test_id"),
-                    "status": test.get("status"),
-                    "outcome": outcome,
-                }
-            )
-
-        passed = len([t for t in test_summaries if t["outcome"] == "pass"])
-        failed = len([t for t in test_summaries if t["outcome"] == "fail"])
-        indeterminate = len(
-            [t for t in test_summaries if t["outcome"] == "indeterminate"]
-        )
-
-        return {
-            "assessor": "fair_champion",
-            "resource_identifier": raw.get("resource_identifier"),
-            "overall": {
-                "tests_total": total,
-                "tests_completed": completed,
-                "tests_failed_to_run": failed_to_run,
-                "tests_passed": passed,
-                "tests_failed": failed,
-                "tests_indeterminate": indeterminate,
-                "pass_percent": round((passed / total) * 100, 2) if total else None,
-            },
-            "tests": test_summaries,
-        }
-
-    def _extract_outcome(self, test: dict[str, Any]) -> str:
-        if test.get("status") != "completed":
-            return "indeterminate"
-
-        raw = test.get("raw")
-        text = str(raw).lower()
-
-        if "pass" in text or "passed" in text:
-            return "pass"
-
-        if "fail" in text or "failed" in text:
-            return "fail"
-
-        return "indeterminate"
-
     def normalize(
         self,
         raw: dict[str, Any],
@@ -509,12 +401,26 @@ class FairChampionAssessor(AssessorPlugin):
 
         outcomes_by_principle: dict[str, list[FairOutcome]] = defaultdict(list)
         unmapped_tests: list[str] = []
+        execution_errors = 0
+        algorithm_results = raw.get("test_results")
 
         for test in tests:
-            test_id = test.get("test_id")
-            outcome = extract_test_outcome(test)
+            if isinstance(algorithm_results, dict):
+                test_id = test.get("testid") or ""
+                reference = test.get("reference")
+                result = algorithm_results.get(reference) or {}
+                outcome = (
+                    _parse_outcome_value(result.get("result"))
+                    or FairOutcome.indeterminate
+                )
+                principle = cell_for(test_id)
+            else:
+                test_id = test.get("test_id") or ""
+                outcome = extract_test_outcome(test)
+                principle = LEGACY_TEST_TO_PRINCIPLE.get(test_id)
 
-            principle = TEST_TO_PRINCIPLE.get(test_id)
+            if outcome == FairOutcome.error:
+                execution_errors += 1
 
             if principle is None:
                 if test_id:
@@ -561,10 +467,6 @@ class FairChampionAssessor(AssessorPlugin):
         r = combine_outcomes([r1])
 
         overall = combine_outcomes([f, a, i, r])
-
-        execution_errors = sum(
-            1 for test in tests if extract_test_outcome(test) == FairOutcome.error
-        )
 
         status = "completed_with_errors" if execution_errors else "completed"
 

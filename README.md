@@ -41,6 +41,10 @@ Example output:
 }
 ```
 
+For metadata made available through the configured OAI-PMH gateway, submit the
+assessment with `"mode": "cached"`. Both FAIR Champion and F-UJI then assess the
+gateway representation of the dataset metadata.
+
 ## Offline Assessment
 
 Submit JSON-LD or DataCite JSON API `data.attributes` metadata for an initial
@@ -80,9 +84,10 @@ evidence. Missing identifiers fail F1 and F3; the other checks still run.
 
 ## Reports
 
-Get full report:
+Get the harmonized report, including each test's explanation and any practical
+guidance returned by the configured FAIR Champion algorithm:
 ```bash
-curl --location 'localhost:8080/api/v1/assessments/9268ba45-241b-47d5-8e8d-d32180eccc5b'
+curl --location 'localhost:8080/api/v1/assessments/9268ba45-241b-47d5-8e8d-d32180eccc5b/report'
 ```
 
 Get latest report for a PID:
