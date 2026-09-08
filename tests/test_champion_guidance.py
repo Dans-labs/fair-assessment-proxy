@@ -49,6 +49,47 @@ class ChampionGuidanceTest(TestCase):
             guidance_for(self.algorithm_result),
         )
 
+    def test_guidance_is_always_a_list_of_strings(self):
+        for value, expected in (
+            ("Publish metadata", ["Publish metadata"]),
+            (["Publish metadata", None, "", 42], ["Publish metadata"]),
+            (None, []),
+        ):
+            with self.subTest(value=value):
+                self.algorithm_result["guidances"] = [value]
+                entry = guidance_for(self.algorithm_result)[0]
+                self.assertEqual(expected, entry["guidance"])
+
+    def test_missing_or_unknown_outcome_is_indeterminate(self):
+        for value, expected in (
+            (None, "indeterminate"),
+            ("unknown", "indeterminate"),
+            ("error", "error"),
+            ("not_applicable", "not_applicable"),
+            ("unavailable", "unavailable"),
+        ):
+            with self.subTest(value=value):
+                self.algorithm_result["test_results"] = {
+                    "DiscoverableInBing": {"result": value}
+                }
+                self.algorithm_result["conditions"] = [{}]
+                self.algorithm_result["narratives"] = []
+                entry = guidance_for(self.algorithm_result)[0]
+                self.assertEqual(expected, entry["outcome"])
+                self.assertIsNone(entry["description"])
+                self.assertIsNone(entry["message"])
+
+    def test_non_text_details_are_null(self):
+        self.algorithm_result["conditions"] = [
+            {"description": {"text": "Metadata"}}
+        ]
+        self.algorithm_result["narratives"] = [42]
+
+        entry = guidance_for(self.algorithm_result)[0]
+
+        self.assertIsNone(entry["description"])
+        self.assertIsNone(entry["message"])
+
     def test_normalizes_algorithm_results(self):
         assessor = FairChampionAssessor(
             "fair_champion",
@@ -97,7 +138,7 @@ class ChampionGuidanceTest(TestCase):
                     "description": "Checks metadata discoverability",
                     "outcome": "fail",
                     "message": "FAILURE: Metadata was not indexed",
-                    "guidance": None,
+                    "guidance": [],
                 }
             ],
             guidance_for(raw),

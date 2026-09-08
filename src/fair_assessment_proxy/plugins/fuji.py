@@ -7,6 +7,7 @@ import httpx
 from fair_assessment_proxy.models import AssessmentMode, AssessorResult
 from fair_assessment_proxy.plugins.base import AssessmentContext, AssessorPlugin
 from fair_assessment_proxy.models import NormalizedAssessorResult, FairOutcome
+from fair_assessment_proxy.reporting import serialize_guidance
 
 
 METRIC_PATTERN = re.compile(r"^FsF-([FAIR]\d(?:\.\d)?)-")
@@ -81,7 +82,7 @@ def guidance_for(raw):
             }
         )
 
-    return entries
+    return [serialize_guidance(entry) for entry in entries]
 
 
 class FujiAssessor(AssessorPlugin):

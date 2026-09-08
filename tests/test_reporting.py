@@ -21,6 +21,7 @@ class ReportingTest(TestCase):
         self.assertEqual(87.5, result["scores"]["f"])
         self.assertEqual(2, result["scored"]["r"])
         self.assertEqual(["a1", "r1"], result["derived"])
+        self.assertEqual([], result.get("guidance"))
 
     def test_combines_measured_outcomes(self):
         self.assertEqual("pass", combine(["pass", "indeterminate"]))

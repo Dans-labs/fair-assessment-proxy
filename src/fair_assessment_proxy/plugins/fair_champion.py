@@ -10,7 +10,7 @@ import httpx
 from fair_assessment_proxy.models import AssessmentMode, AssessorResult
 from fair_assessment_proxy.models import NormalizedAssessorResult, FairOutcome
 from fair_assessment_proxy.plugins.base import AssessmentContext, AssessorPlugin
-from fair_assessment_proxy.reporting import CELLS, outcome_value
+from fair_assessment_proxy.reporting import CELLS, outcome_value, serialize_guidance
 
 METRIC_PATTERN = re.compile(r"FM_([A-Z]\d(?:_\d)?)_M_")
 
@@ -279,15 +279,7 @@ def guidance_for(raw):
             }
         )
 
-    return entries
-
-
-def _guidance_text(value):
-    if isinstance(value, list):
-        values = [item for item in value if item]
-        return values or None
-
-    return value or None
+    return [serialize_guidance(entry) for entry in entries]
 
 
 def _algorithm_guidance_for(raw):
@@ -314,11 +306,11 @@ def _algorithm_guidance_for(raw):
                 "description": condition.get("description"),
                 "outcome": (results.get(reference) or {}).get("result"),
                 "message": narratives[index] if index < len(narratives) else None,
-                "guidance": _guidance_text(guidance),
+                "guidance": guidance,
             }
         )
 
-    return entries
+    return [serialize_guidance(entry) for entry in entries]
 
 
 def pid_to_doi(pid: str) -> str:

@@ -1,3 +1,4 @@
+from copy import deepcopy
 from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import patch
@@ -52,27 +53,7 @@ class ResultEndpointTest(IsolatedAsyncioTestCase):
             assessor_version="3.5.1",
             **dict.fromkeys(CELLS, "pass"),
         )
-
-    async def test_results_returns_toolkit_grid(self):
-        session = FakeSession(self.assessment, [[self.row]])
-
-        with patch.object(assessments, "AsyncSessionLocal", return_value=session):
-            response = await assessments.get_results("id")
-
-        self.assertEqual("fuji", response["results"][0]["assessor"])
-        self.assertEqual(100.0, response["results"][0]["scores"]["overall"])
-
-    async def test_single_assessor_result_includes_raw_response(self):
-        raw_row = SimpleNamespace(raw={"source": "fuji"})
-        session = FakeSession(self.assessment, [[self.row], [raw_row]])
-
-        with patch.object(assessments, "AsyncSessionLocal", return_value=session):
-            response = await assessments.get_result_for_assessor("id", "fuji")
-
-        self.assertEqual({"source": "fuji"}, response["raw"])
-
-    async def test_report_contains_cells_scores_and_guidance(self):
-        raw_row = SimpleNamespace(
+        self.raw_row = SimpleNamespace(
             assessor="fuji",
             raw={
                 "results": [
@@ -87,7 +68,84 @@ class ResultEndpointTest(IsolatedAsyncioTestCase):
                 ]
             },
         )
-        session = FakeSession(self.assessment, [[self.row], [raw_row]])
+
+    async def test_results_returns_toolkit_grid(self):
+        champion = SimpleNamespace(
+            assessor="fair_champion",
+            assessor_version="0.5.8",
+            **dict.fromkeys(CELLS, "pass"),
+        )
+        champion_raw = SimpleNamespace(
+            assessor="fair_champion",
+            raw={
+                "tests": [{"reference": "DiscoverableInBing"}],
+                "test_results": {},
+                "conditions": [{"guidance": "Publish metadata"}],
+            },
+        )
+        session = FakeSession(
+            self.assessment,
+            [[self.row, champion], [champion_raw, self.raw_row]],
+        )
+
+        with patch.object(assessments, "AsyncSessionLocal", return_value=session):
+            response = await assessments.get_results("id")
+
+        self.assertEqual("fuji", response["results"][0]["assessor"])
+        self.assertEqual(100.0, response["results"][0]["scores"]["overall"])
+        self.assertEqual(
+            [
+                {
+                    "assessor": "fuji",
+                    "cell": "r1_1",
+                    "test": "FsF-R1.1-01M",
+                    "description": "License information",
+                    "outcome": "fail",
+                    "message": "No licence found",
+                    "guidance": [],
+                }
+            ],
+            response["results"][0].get("guidance"),
+        )
+        self.assertEqual(
+            [
+                {
+                    "assessor": "fair_champion",
+                    "cell": None,
+                    "test": "DiscoverableInBing",
+                    "description": None,
+                    "outcome": "indeterminate",
+                    "message": None,
+                    "guidance": ["Publish metadata"],
+                }
+            ],
+            response["results"][1].get("guidance"),
+        )
+        for result in response["results"]:
+            self.assertNotIn("raw", result)
+
+    async def test_results_without_raw_data_have_empty_guidance(self):
+        session = FakeSession(self.assessment, [[self.row], []])
+
+        with patch.object(assessments, "AsyncSessionLocal", return_value=session):
+            response = await assessments.get_results("id")
+
+        self.assertEqual([], response["results"][0].get("guidance"))
+
+    async def test_single_assessor_result_includes_raw_response(self):
+        original_raw = deepcopy(self.raw_row.raw)
+        session = FakeSession(self.assessment, [[self.row], [self.raw_row]])
+
+        with patch.object(assessments, "AsyncSessionLocal", return_value=session):
+            response = await assessments.get_result_for_assessor("id", "fuji")
+
+        self.assertEqual(original_raw, response["raw"])
+        self.assertIn("guidance", response)
+        self.assertEqual("No licence found", response["guidance"][0]["message"])
+        self.assertEqual([], response["guidance"][0]["guidance"])
+
+    async def test_report_contains_cells_scores_and_guidance(self):
+        session = FakeSession(self.assessment, [[self.row], [self.raw_row]])
 
         with patch.object(assessments, "AsyncSessionLocal", return_value=session):
             response = await assessments.get_report("id")
@@ -95,6 +153,7 @@ class ResultEndpointTest(IsolatedAsyncioTestCase):
         self.assertEqual(15, len(response["cells"]))
         self.assertEqual(100.0, response["scores"]["fuji"]["overall"])
         self.assertEqual("fuji", response["guidance"][0]["assessor"])
+        self.assertEqual([], response["guidance"][0]["guidance"])
 
     async def test_missing_assessment_is_404(self):
         session = FakeSession(None, [])

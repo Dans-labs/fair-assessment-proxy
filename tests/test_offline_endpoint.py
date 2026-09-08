@@ -63,6 +63,15 @@ class OfflineEndpointTest(IsolatedAsyncioTestCase):
             entry for entry in body["guidance"] if entry["cell"] == "f1"
         )
         self.assertTrue(identifier_guidance["message"])
+        self.assertIsInstance(identifier_guidance["guidance"], list)
+        self.assertTrue(identifier_guidance["guidance"])
+        for entry in body["guidance"]:
+            self.assertIsInstance(entry["guidance"], list)
+            self.assertTrue(
+                all(isinstance(text, str) for text in entry["guidance"])
+            )
+            if entry["outcome"] in {"pass", "indeterminate"}:
+                self.assertEqual([], entry["guidance"])
 
     async def test_returns_an_immediate_assessment_for_supplied_metadata(self):
         app = FastAPI()
