@@ -313,7 +313,7 @@ def assess_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     r1_2, r1_2_message = _provenance(root)
     r1_3, r1_3_message = _standard(root)
 
-    cells = dict.fromkeys(CELLS, "unmeasured")
+    cells = dict.fromkeys(CELLS, "indeterminate")
     cells.update(
         {
             "f1": f1,

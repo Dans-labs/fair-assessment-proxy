@@ -17,19 +17,19 @@ class ReportingTest(TestCase):
 
         result = serialize_result(row)
 
-        self.assertEqual("unmeasured", result["cells"]["r1_3"])
+        self.assertEqual("indeterminate", result["cells"]["r1_3"])
         self.assertEqual(87.5, result["scores"]["f"])
         self.assertEqual(2, result["scored"]["r"])
         self.assertEqual(["a1", "r1"], result["derived"])
 
     def test_combines_measured_outcomes(self):
-        self.assertEqual("pass", combine(["pass", "unmeasured"]))
+        self.assertEqual("pass", combine(["pass", "indeterminate"]))
         self.assertEqual("fail", combine(["pass", "fail"]))
         self.assertEqual("partial", combine(["pass", "partial"]))
-        self.assertEqual("unmeasured", combine(["unmeasured"]))
+        self.assertEqual("indeterminate", combine(["indeterminate"]))
 
     def test_derives_parent_cells_instead_of_trusting_legacy_columns(self):
-        values = dict.fromkeys(CELLS, "unmeasured")
+        values = dict.fromkeys(CELLS, "indeterminate")
         values.update(
             {
                 "a1": "fail",

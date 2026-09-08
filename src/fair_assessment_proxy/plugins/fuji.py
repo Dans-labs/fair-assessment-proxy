@@ -21,7 +21,7 @@ def outcome_of(result):
     status = str(result.get("test_status", "")).strip().lower()
 
     if status not in {"pass", "partial", "fail"}:
-        return "unmeasured"
+        return "indeterminate"
     if status == "fail":
         return "fail"
 
@@ -34,7 +34,7 @@ def outcome_of(result):
         return "partial" if status == "partial" else "pass"
 
     if total <= 0:
-        return "unmeasured"
+        return "indeterminate"
     if earned <= 0:
         return "fail"
     return "pass" if earned >= total else "partial"
