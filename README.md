@@ -79,7 +79,7 @@ result = assess_metadata(metadata)
 ```
 
 The assessor checks F1, F2, F3, I1, I3, R1.1, R1.2, and R1.3 using the supplied
-metadata. F4, I2, A1.1, A1.2, and A2 remain `unmeasured` because they need external
+metadata. F4, I2, A1.1, A1.2, and A2 remain `indeterminate` because they need external
 evidence. Missing identifiers fail F1 and F3; the other checks still run.
 
 ## Reports

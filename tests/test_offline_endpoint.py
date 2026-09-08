@@ -57,7 +57,7 @@ class OfflineEndpointTest(IsolatedAsyncioTestCase):
         self.assertEqual("pass", body["cells"]["f2"])
         self.assertEqual("pass", body["cells"]["r1_1"])
         for cell in ("f4", "a1_1", "a1_2", "a2", "i2"):
-            self.assertEqual("unmeasured", body["cells"][cell])
+            self.assertEqual("indeterminate", body["cells"][cell])
         self.assertIsNone(body["scores"]["a"])
         identifier_guidance = next(
             entry for entry in body["guidance"] if entry["cell"] == "f1"

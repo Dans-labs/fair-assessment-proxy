@@ -34,7 +34,7 @@ _RAW_MISSING = object()
 
 def outcome_value(value):
     value = getattr(value, "value", value)
-    return value if value in POINTS else "unmeasured"
+    return value if value in POINTS else "indeterminate"
 
 
 def cells_for(row):
@@ -54,7 +54,7 @@ def scores_for(cells):
         points = [
             POINTS[cells[cell]]
             for cell in members
-            if cell not in DERIVED and cells[cell] != "unmeasured"
+            if cell not in DERIVED and cells[cell] != "indeterminate"
         ]
         scores[principle] = round(sum(points) / len(points), 1) if points else None
         scored[principle] = len(points)
@@ -69,10 +69,10 @@ def scores_for(cells):
 
 
 def combine(outcomes):
-    measured = [outcome for outcome in outcomes if outcome != "unmeasured"]
+    measured = [outcome for outcome in outcomes if outcome != "indeterminate"]
 
     if not measured:
-        return "unmeasured"
+        return "indeterminate"
     if all(outcome == "pass" for outcome in measured):
         return "pass"
     if any(outcome == "fail" for outcome in measured):
