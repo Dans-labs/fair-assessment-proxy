@@ -506,6 +506,16 @@ async def load_assessment(db, assessment_id):
     return assessment
 
 
+def guidance_for(assessor, raw):
+    if not raw:
+        return []
+    if assessor == "fair_champion":
+        return champion_guidance(raw)
+    if assessor == "fuji":
+        return fuji_guidance(raw)
+    return []
+
+
 @router.get("/{assessment_id}/results", tags=["Assessments"])
 async def get_results(assessment_id: str):
     async with AsyncSessionLocal() as db:
@@ -517,12 +527,28 @@ async def get_results(assessment_id: str):
                 .order_by(HarmonizedAssessment.assessor)
             )
         ).scalars().all()
+        raw_rows = (
+            await db.execute(
+                select(RawAssessment).where(
+                    RawAssessment.assessment_id == assessment_id
+                )
+            )
+        ).scalars().all()
+        raw_by_assessor = {row.assessor: row.raw for row in raw_rows}
 
         return {
             "id": assessment.id,
             "pid": assessment.pid,
             "status": assessment.status,
-            "results": [serialize_result(row) for row in rows],
+            "results": [
+                serialize_result(
+                    row,
+                    guidance=guidance_for(
+                        row.assessor, raw_by_assessor.get(row.assessor)
+                    ),
+                )
+                for row in rows
+            ],
         }
 
 
@@ -554,7 +580,12 @@ async def get_result_for_assessor(assessment_id: str, assessor: str):
             )
         ).scalar_one_or_none()
 
-        return serialize_result(row, raw.raw if raw else None)
+        raw_payload = raw.raw if raw else None
+        return serialize_result(
+            row,
+            raw_payload,
+            guidance=guidance_for(assessor, raw_payload),
+        )
 
 
 @router.get("/{assessment_id}/report", tags=["Assessments"])
@@ -594,10 +625,7 @@ async def get_report(assessment_id: str):
         guidance = []
 
         for raw_row in raw_rows:
-            if raw_row.assessor == "fair_champion":
-                guidance.extend(champion_guidance(raw_row.raw))
-            elif raw_row.assessor == "fuji":
-                guidance.extend(fuji_guidance(raw_row.raw))
+            guidance.extend(guidance_for(raw_row.assessor, raw_row.raw))
 
         return {
             "id": assessment.id,

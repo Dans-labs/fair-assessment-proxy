@@ -29,6 +29,7 @@ PARENTS = {
     "r1": ("r1_1", "r1_2", "r1_3"),
 }
 POINTS = {"pass": 100.0, "partial": 50.0, "fail": 0.0}
+OUTCOMES = {*POINTS, "indeterminate", "error", "not_applicable", "unavailable"}
 _RAW_MISSING = object()
 
 
@@ -80,7 +81,30 @@ def combine(outcomes):
     return "partial"
 
 
-def serialize_result(row, raw=_RAW_MISSING):
+def serialize_guidance(entry):
+    result = {"assessor": entry["assessor"]}
+    for field in ("cell", "test", "description", "message"):
+        value = entry.get(field)
+        result[field] = value if isinstance(value, str) else None
+
+    outcome = entry.get("outcome")
+    result["outcome"] = (
+        outcome
+        if isinstance(outcome, str) and outcome in OUTCOMES
+        else "indeterminate"
+    )
+    guidance = entry.get("guidance")
+    if isinstance(guidance, str):
+        guidance = [guidance]
+    result["guidance"] = [
+        text
+        for text in (guidance if isinstance(guidance, list) else [])
+        if isinstance(text, str) and text
+    ]
+    return result
+
+
+def serialize_result(row, raw=_RAW_MISSING, *, guidance=None):
     cells = cells_for(row)
     scores, scored = scores_for(cells)
     result = {
@@ -94,6 +118,7 @@ def serialize_result(row, raw=_RAW_MISSING):
         "scored": scored,
         "derived": sorted(DERIVED),
         "unmapped": [],
+        "guidance": guidance or [],
     }
 
     if raw is not _RAW_MISSING:

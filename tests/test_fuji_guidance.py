@@ -30,5 +30,7 @@ class FujiGuidanceTest(TestCase):
         self.assertEqual("fuji", entry["assessor"])
         self.assertEqual("r1_1", entry["cell"])
         self.assertEqual("fail", entry["outcome"])
+        self.assertEqual("License information", entry["description"])
+        self.assertEqual([], entry["guidance"])
         self.assertIn("No license found", entry["message"])
         self.assertIn("Metadata has no recognised licence", entry["message"])

@@ -2,7 +2,13 @@ import re
 from typing import Any
 from urllib.parse import urlparse
 
-from fair_assessment_proxy.reporting import CELLS, PARENTS, combine, scores_for
+from fair_assessment_proxy.reporting import (
+    CELLS,
+    PARENTS,
+    combine,
+    scores_for,
+    serialize_guidance,
+)
 
 
 OFFLINE_ASSESSOR_VERSION = "1"
@@ -281,7 +287,7 @@ def _guidance(cells: dict[str, str], messages: dict[str, str]) -> list[dict[str,
                 "guidance": suggestion,
             }
         )
-    return entries
+    return [serialize_guidance(entry) for entry in entries]
 
 
 def assess_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
