@@ -3,7 +3,7 @@ assessors:
     enabled: true
     class: "fair_assessment_proxy.plugins.fuji.FujiAssessor"
     name: "F-UJI"
-    version: "latest"
+    version: "3.5.0"
     base_url: "http://fuji:1071/fuji/api/v1"
 
     cached_mode:
