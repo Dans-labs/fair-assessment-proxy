@@ -13,7 +13,7 @@ from fair_assessment_proxy.models import (
 class AssessmentContext:
     pid: str
     mode: AssessmentMode
-
+    metadata: dict[str, Any] | None = None  #only populated for AssessmentMode.offline
 
 class AssessorPlugin(ABC):
     """

@@ -216,7 +216,8 @@ class AssessmentRequest(BaseModel):
     mode: AssessmentMode = AssessmentMode.public
     cached: bool = False
     assessors: list[str] | None = None
-
+    metadata: dict[str, Any] | None = None  # required only if "offline" is in assessors
+    
 
 class AssessorResult(BaseModel):
     assessor_id: str

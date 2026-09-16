@@ -13,8 +13,8 @@ from fair_assessment_proxy.models import (
     RawAssessment,
     HarmonizedAssessment,
     Assessment,
+    AssessmentMode,
 )
-from fair_assessment_proxy.offline import assess_metadata
 from fair_assessment_proxy.db import AsyncSessionLocal
 from fair_assessment_proxy.plugin_loader import load_assessor_plugins
 from fair_assessment_proxy.plugins.base import AssessmentContext
@@ -24,8 +24,10 @@ from fair_assessment_proxy.plugins.fair_champion import (
 from fair_assessment_proxy.plugins.fuji import guidance_for as fuji_guidance
 from fair_assessment_proxy.reporting import (
     CELLS,
+    DERIVED,
     cells_for,
     combine,
+    scores_for,
     serialize_result,
 )
 
@@ -65,8 +67,9 @@ def normalize_pid(pid: str) -> str:
 
 
 class AssessmentCreated(BaseModel):
-    id: str
+    id: str | None = None
     status: str
+    offline: dict[str, Any] | None = None
 
 
 class OfflineAssessmentRequest(BaseModel):
@@ -398,6 +401,9 @@ async def update_assessment_status(
 
 @router.post("/", response_model=AssessmentCreated, tags=["Assessments"])
 async def create_assessment(req: AssessmentRequest):
+    # selected = req.assessors or [
+    #     assessor_id for assessor_id in PLUGINS if assessor_id != "offline"
+    # ]
     selected = req.assessors or list(PLUGINS.keys())
 
     unknown = [assessor_id for assessor_id in selected if assessor_id not in PLUGINS]
@@ -408,13 +414,69 @@ async def create_assessment(req: AssessmentRequest):
             detail=f"Unknown assessor(s): {unknown}",
         )
 
+    offline_requested = "offline" in selected
+    online_assessors = [a for a in selected if a != "offline"]
+
+    if offline_requested and not req.metadata:
+        raise HTTPException(
+            status_code=400,
+            detail="'metadata' is required when 'offline' is included in assessors",
+        )
+
+    offline_result = None
+
+    if offline_requested:
+        offline_metadata = req.metadata.get("metadata") if req.metadata else None
+        context = AssessmentContext(
+            pid=normalize_pid(req.pid),
+            mode=AssessmentMode.offline,
+            metadata=offline_metadata,
+        )
+
+        result = await PLUGINS["offline"].assess(context)
+
+        if result.status == "failed":
+            raise HTTPException(status_code=422, detail=result.error)
+
+        normalised = result.normalised
+
+        # Same flat shape as the "results" list items on GET /{assessment_id}
+        # and /latest — no cells/scores/guidance wrapper, but at least guidance would be useful later on for all assessments.
+        offline_result = {
+            "assessor": result.assessor_id,
+            "assessor_version": result.version,
+            "f": normalised.f,
+            "f1": normalised.f1,
+            "f2": normalised.f2,
+            "f3": normalised.f3,
+            "f4": normalised.f4,
+            "a": normalised.a,
+            "a1": normalised.a1,
+            "a1_1": normalised.a1_1,
+            "a1_2": normalised.a1_2,
+            "a2": normalised.a2,
+            "i": normalised.i,
+            "i1": normalised.i1,
+            "i2": normalised.i2,
+            "i3": normalised.i3,
+            "r": normalised.r,
+            "r1": normalised.r1,
+            "r1_1": normalised.r1_1,
+            "r1_2": normalised.r1_2,
+            "r1_3": normalised.r1_3,
+        }
+
+    if not online_assessors:
+        # offline-only request: nothing queued, nothing persisted, done here.
+        return AssessmentCreated(id=None, status="completed", offline=offline_result)
+
     assessment_id = str(uuid.uuid4())
 
     await create_assessment_record(
         assessment_id=assessment_id,
         pid=normalize_pid(req.pid),
         mode=req.mode,
-        assessors=selected,
+        assessors=online_assessors,
         cached=req.cached,
     )
 
@@ -423,13 +485,8 @@ async def create_assessment(req: AssessmentRequest):
     return AssessmentCreated(
         id=assessment_id,
         status="queued",
+        offline=offline_result,
     )
-
-
-@router.post("/offline", tags=["Assessments"])
-async def create_offline_assessment(req: OfflineAssessmentRequest):
-    return assess_metadata(req.metadata)
-
 
 @router.get("/latest", tags=["Assessments"])
 async def get_latest_assessment(pid: str):

@@ -1,12 +1,20 @@
+from __future__ import annotations
+
 import re
 from typing import Any
 from urllib.parse import urlparse
 
+from fair_assessment_proxy.models import (
+    AssessmentMode,
+    AssessorResult,
+    FairOutcome,
+    NormalizedAssessorResult,
+)
+from fair_assessment_proxy.plugins.base import AssessmentContext, AssessorPlugin
 from fair_assessment_proxy.reporting import (
     CELLS,
     PARENTS,
     combine,
-    scores_for,
     serialize_guidance,
 )
 
@@ -268,30 +276,15 @@ def _standard(root: dict[str, Any]) -> tuple[str, str]:
     return "fail", "No metadata standard or schema was declared."
 
 
-def _guidance(cells: dict[str, str], messages: dict[str, str]) -> list[dict[str, Any]]:
-    entries = []
-    for cell in CELLS:
-        outcome = cells[cell]
-        message = messages.get(cell) or UNMEASURED_MESSAGES.get(cell)
-        suggestion = None
-        if outcome in {"fail", "partial"}:
-            suggestion = f"Improve metadata for {cell.upper()}: {DESCRIPTIONS[cell]}"
-        entries.append(
-            {
-                "assessor": "offline",
-                "cell": cell,
-                "test": f"offline:{cell}",
-                "description": DESCRIPTIONS[cell],
-                "outcome": outcome,
-                "message": message,
-                "guidance": suggestion,
-            }
-        )
-    return [serialize_guidance(entry) for entry in entries]
+def _evaluate(metadata: dict[str, Any]) -> tuple[dict[str, str], dict[str, str]]:
+    """
+    Compute per-cell FAIR outcomes (as plain strings, e.g. "pass"/"fail") and
+    human-readable messages for one metadata record.
 
-
-def assess_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
-    """Assess FAIR characteristics that can be observed without network access."""
+    This is the single source of truth for offline scoring logic. It is used
+    both by `guidance_for()` (module-level, mirroring the fair_champion/fuji
+    convention) and by `OfflineAssessor.normalize()`.
+    """
     if not isinstance(metadata, dict):
         raise TypeError("metadata must be a JSON object")
 
@@ -335,7 +328,10 @@ def assess_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     for parent, children in PARENTS.items():
         cells[parent] = combine([cells[child] for child in children])
 
-    scores, scored = scores_for(cells)
+    # NOTE: PARENTS only derives a1/r1. Top-level F/A/I/R aren't cells at
+    # all (they're not in CELLS/DESCRIPTIONS, so guidance never mentions
+    # them) — normalize() combines them directly from f1-f4/a1+a2/i1-i3/r1.
+
     messages = {
         "f1": f1_message,
         "f2": f2_message,
@@ -353,16 +349,127 @@ def assess_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
         "r1": "Derived from the licence, provenance, and standards checks.",
     }
 
-    return {
-        "assessor": "offline",
-        "status": "completed",
-        "assessor_version": OFFLINE_ASSESSOR_VERSION,
-        "profile_ref": None,
-        "error": None,
-        "cells": cells,
-        "scores": scores,
-        "scored": scored,
-        "derived": sorted(PARENTS),
-        "unmapped": [],
-        "guidance": _guidance(cells, messages),
-    }
+    return cells, messages
+
+
+def _guidance(cells: dict[str, str], messages: dict[str, str]) -> list[dict[str, Any]]:
+    entries = []
+    for cell in CELLS:
+        outcome = cells[cell]
+        message = messages.get(cell) or UNMEASURED_MESSAGES.get(cell)
+        suggestion = None
+        if outcome in {"fail", "partial"}:
+            suggestion = f"Improve metadata for {cell.upper()}: {DESCRIPTIONS[cell]}"
+        entries.append(
+            {
+                "assessor": "offline",
+                "cell": cell,
+                "test": f"offline:{cell}",
+                "description": DESCRIPTIONS[cell],
+                "outcome": outcome,
+                "message": message,
+                "guidance": suggestion,
+            }
+        )
+    return [serialize_guidance(entry) for entry in entries]
+
+
+def guidance_for(raw: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Module-level guidance function, mirroring the convention used by
+    `fair_champion.guidance_for()` and `fuji.guidance_for()`: given an
+    assessor's raw payload, return the serialized guidance entries.
+
+    For offline, `raw` is the metadata record itself (see
+    `OfflineAssessor.assess`, which stores the input metadata as `raw`).
+    """
+    cells, messages = _evaluate(raw)
+    return _guidance(cells, messages)
+
+
+class OfflineAssessor(AssessorPlugin):
+    """
+    FAIR assessment for unpublished datasets, based purely on a metadata
+    record supplied by the caller (no network access, no DOI resolution).
+    """
+
+    async def assess(self, context: AssessmentContext) -> AssessorResult:
+        try:
+            metadata = self._metadata(context)
+
+            return AssessorResult(
+                assessor_id=self.assessor_id,
+                version=OFFLINE_ASSESSOR_VERSION,
+                name=self.name,
+                status="completed",
+                raw=metadata,
+                normalised=self.normalize(metadata, context),
+            )
+
+        except Exception as exc:
+            return AssessorResult(
+                assessor_id=self.assessor_id,
+                name=self.name,
+                status="failed",
+                error=str(exc),
+            )
+
+    def _metadata(self, context: AssessmentContext) -> dict[str, Any]:
+        # NOTE: assumes AssessmentContext gains an optional `metadata` field
+        # for AssessmentMode.offline, since offline assessment has no DOI to
+        # resolve. See the accompanying note on base.py/models.py.
+        metadata = getattr(context, "metadata", None)
+
+        if not metadata:
+            raise ValueError(
+                "Offline assessment requires a metadata record on the "
+                "assessment context"
+            )
+
+        return metadata
+
+    def normalize(
+        self,
+        raw: dict[str, Any],
+        context: AssessmentContext,
+    ) -> NormalizedAssessorResult:
+        cells, _messages = _evaluate(raw)
+
+        def outcome(key: str) -> FairOutcome:
+            return FairOutcome(cells[key])
+
+        # Top-level F/A/I/R combined directly from their real children
+        # (a1 and r1 already summarize a1_1/a1_2 and r1_1/r1_2/r1_3, so
+        # there's no need to re-include those leaves here).
+        f = combine([cells["f1"], cells["f2"], cells["f3"], cells["f4"]])
+        a = combine([cells["a1"], cells["a2"]])
+        i = combine([cells["i1"], cells["i2"], cells["i3"]])
+        r = combine([cells["r1"]])
+        overall = combine([f, a, i, r])
+
+        return NormalizedAssessorResult(
+            assessor=self.assessor_id,
+            profile=self.config.get("profile", "offline"),
+            status="completed",
+            overall=FairOutcome(overall),
+            f=FairOutcome(f),
+            a=FairOutcome(a),
+            i=FairOutcome(i),
+            r=FairOutcome(r),
+            f1=outcome("f1"),
+            f2=outcome("f2"),
+            f3=outcome("f3"),
+            f4=outcome("f4"),
+            a1=outcome("a1"),
+            a1_1=outcome("a1_1"),
+            a1_2=outcome("a1_2"),
+            a2=outcome("a2"),
+            i1=outcome("i1"),
+            i2=outcome("i2"),
+            i3=outcome("i3"),
+            r1=outcome("r1"),
+            r1_1=outcome("r1_1"),
+            r1_2=outcome("r1_2"),
+            r1_3=outcome("r1_3"),
+            extra={"source": "offline"},
+        )

@@ -1,10 +1,45 @@
+import asyncio
 from copy import deepcopy
 from unittest import TestCase
 
-try:
-    from fair_assessment_proxy.offline import assess_metadata
-except ModuleNotFoundError:
-    assess_metadata = None
+from fair_assessment_proxy.models import AssessmentMode
+from fair_assessment_proxy.plugins.base import AssessmentContext
+from fair_assessment_proxy.plugins.offline import OfflineAssessor, guidance_for
+from fair_assessment_proxy.reporting import cells_for, scores_for
+
+def assess_metadata(metadata):
+    """
+    Test-only shim: drive the real OfflineAssessor plugin and reshape its
+    result into the same {"assessor", "status", "cells", "scores", "scored",
+    "guidance"} dict the old module-level assess_metadata() used to return.
+
+    This mirrors exactly what api/assessments.py's /offline route does with
+    a plugin result, so these tests exercise the same code path production
+    traffic hits.
+    """
+    assessor = OfflineAssessor(assessor_id="offline", config={})
+    context = AssessmentContext(
+        pid="test",
+        mode=AssessmentMode.offline,
+        metadata=metadata,
+    )
+
+    result = asyncio.run(assessor.assess(context))
+
+    if result.status == "failed":
+        raise RuntimeError(result.error)
+
+    cells = cells_for(result.normalised)
+    scores, scored = scores_for(cells)
+
+    return {
+        "assessor": result.assessor_id,
+        "status": result.status,
+        "cells": cells,
+        "scores": scores,
+        "scored": scored,
+        "guidance": guidance_for(result.raw),
+    }
 
 
 class OfflineAssessmentTest(TestCase):
@@ -49,7 +84,6 @@ class OfflineAssessmentTest(TestCase):
                 self.assertEqual(original, metadata)
 
     def test_assesses_locally_observable_jsonld_metadata(self):
-        self.assertIsNotNone(assess_metadata, "offline assessor is not implemented")
         metadata = {
             "@context": "https://schema.org/",
             "@type": "Dataset",
@@ -92,8 +126,6 @@ class OfflineAssessmentTest(TestCase):
         self.assertEqual(original, metadata)
 
     def test_missing_fields_fail_only_checks_that_metadata_can_answer(self):
-        self.assertIsNotNone(assess_metadata, "offline assessor is not implemented")
-
         result = assess_metadata({"title": "Unpublished draft"})
 
         self.assertEqual("fail", result["cells"]["f1"])
@@ -107,7 +139,6 @@ class OfflineAssessmentTest(TestCase):
         self.assertIsNone(result["scores"]["a"])
 
     def test_understands_a_datacite_json_api_envelope(self):
-        self.assertIsNotNone(assess_metadata, "offline assessor is not implemented")
         metadata = {
             "data": {
                 "id": "10.1234/example",
