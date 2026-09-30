@@ -13,6 +13,7 @@ from fair_assessment_proxy.models import (
     RawAssessment,
     HarmonizedAssessment,
     Assessment,
+    AssessmentMode,
 )
 from fair_assessment_proxy.offline import assess_metadata
 from fair_assessment_proxy.db import AsyncSessionLocal
@@ -65,8 +66,9 @@ def normalize_pid(pid: str) -> str:
 
 
 class AssessmentCreated(BaseModel):
-    id: str
+    id: str | None
     status: str
+    offline: dict[str, Any] | None = None
 
 
 class OfflineAssessmentRequest(BaseModel):
@@ -356,7 +358,7 @@ async def create_assessment_record(
     assessment_id: str,
     pid: str,
     mode: str,
-    assessors: list[str] | None = None,
+    assessors: list[str],
     cached: bool = False,
 ):
     async with AsyncSessionLocal() as db:
@@ -365,7 +367,7 @@ async def create_assessment_record(
                 id=assessment_id,
                 pid=pid,
                 mode=mode,
-                assessors=assessors or list(PLUGINS.keys()),
+                assessors=assessors,
                 cached=cached,
                 status="queued",
             )
@@ -398,7 +400,11 @@ async def update_assessment_status(
 
 @router.post("/", response_model=AssessmentCreated, tags=["Assessments"])
 async def create_assessment(req: AssessmentRequest):
-    selected = req.assessors or list(PLUGINS.keys())
+    selected = req.assessors or [
+        assessor_id
+        for assessor_id in PLUGINS
+        if (req.metadata if assessor_id == "offline" else req.pid)
+    ]
 
     unknown = [assessor_id for assessor_id in selected if assessor_id not in PLUGINS]
 
@@ -408,13 +414,32 @@ async def create_assessment(req: AssessmentRequest):
             detail=f"Unknown assessor(s): {unknown}",
         )
 
+    if not selected:
+        raise HTTPException(status_code=400, detail="Supply a pid or metadata.")
+    online = [assessor_id for assessor_id in selected if assessor_id != "offline"]
+    if "offline" in selected and not req.metadata:
+        raise HTTPException(
+            status_code=400, detail="The offline assessor needs metadata."
+        )
+    if online and not req.pid:
+        raise HTTPException(status_code=400, detail="Online assessors need a pid.")
+
+    offline = None
+    if "offline" in selected:
+        context = AssessmentContext(
+            pid=req.pid, mode=AssessmentMode.offline, metadata=req.metadata
+        )
+        offline = (await PLUGINS["offline"].assess(context)).raw
+    if not online:
+        return AssessmentCreated(id=None, status="completed", offline=offline)
+
     assessment_id = str(uuid.uuid4())
 
     await create_assessment_record(
         assessment_id=assessment_id,
         pid=normalize_pid(req.pid),
         mode=req.mode,
-        assessors=selected,
+        assessors=online,
         cached=req.cached,
     )
 
@@ -423,6 +448,7 @@ async def create_assessment(req: AssessmentRequest):
     return AssessmentCreated(
         id=assessment_id,
         status="queued",
+        offline=offline,
     )
 
 

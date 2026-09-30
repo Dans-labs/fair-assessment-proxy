@@ -11,8 +11,9 @@ from fair_assessment_proxy.models import (
 
 @dataclass
 class AssessmentContext:
-    pid: str
+    pid: str | None
     mode: AssessmentMode
+    metadata: dict[str, Any] | None = None
 
 
 class AssessorPlugin(ABC):
