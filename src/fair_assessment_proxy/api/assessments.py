@@ -15,7 +15,6 @@ from fair_assessment_proxy.models import (
     Assessment,
     AssessmentMode,
 )
-from fair_assessment_proxy.offline import assess_metadata
 from fair_assessment_proxy.db import AsyncSessionLocal
 from fair_assessment_proxy.plugin_loader import load_assessor_plugins
 from fair_assessment_proxy.plugins.base import AssessmentContext
@@ -69,10 +68,6 @@ class AssessmentCreated(BaseModel):
     id: str | None
     status: str
     offline: dict[str, Any] | None = None
-
-
-class OfflineAssessmentRequest(BaseModel):
-    metadata: dict[str, Any]
 
 
 async def store_assessment_result(
@@ -450,11 +445,6 @@ async def create_assessment(req: AssessmentRequest):
         status="queued",
         offline=offline,
     )
-
-
-@router.post("/offline", tags=["Assessments"])
-async def create_offline_assessment(req: OfflineAssessmentRequest):
-    return await asyncio.to_thread(assess_metadata, req.metadata)
 
 
 @router.get("/latest", tags=["Assessments"])
