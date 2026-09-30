@@ -18,3 +18,7 @@ api_prefix = "/api/v1"
 admin_auth_key = "changeme"
 egi_env = "development" # Set to "production" or "development" or "demo"
 
+
+[retrieval]
+requests_per_minute = 10
+max_concurrent = 4
