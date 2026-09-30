@@ -19,3 +19,8 @@ assessors:
     champion_base_url: "http://fair-champion:4567/champion"
     algorithm: "1UvHnRkKy3KZMlWdIdB7rz0LrBZJXpPibAgmTXJwRO_0"
     metadata_gateway_base_url: "http://metadata-gateway:3000"
+
+  offline:
+    enabled: true
+    class: "fair_assessment_proxy.offline.OfflineAssessor"
+    name: "Offline (F-UJI 3.5.1)"

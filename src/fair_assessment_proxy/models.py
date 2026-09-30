@@ -212,10 +212,11 @@ class AssessmentMode(str, enum.Enum):
 
 
 class AssessmentRequest(BaseModel):
-    pid: str = Field(..., examples=["https://doi.org/10.1594/PANGAEA.908011"])
+    pid: str | None = Field(None, examples=["https://doi.org/10.1594/PANGAEA.908011"])
     mode: AssessmentMode = AssessmentMode.public
     cached: bool = False
     assessors: list[str] | None = None
+    metadata: dict[str, Any] | None = None
 
 
 class AssessorResult(BaseModel):

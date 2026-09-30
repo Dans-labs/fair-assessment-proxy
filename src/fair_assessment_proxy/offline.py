@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Iterable
 from types import SimpleNamespace
 from typing import Any
@@ -5,6 +6,8 @@ from typing import Any
 from fair_offline_assessor import Assessor
 from fair_offline_assessor.models import AssessmentResult, MetricResult
 
+from fair_assessment_proxy.models import AssessorResult
+from fair_assessment_proxy.plugins.base import AssessmentContext, AssessorPlugin
 from fair_assessment_proxy.plugins.fuji import cell_for
 from fair_assessment_proxy.reporting import (
     CELLS,
@@ -94,3 +97,18 @@ def assess_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
         ),
         "profile_ref": f"{result.profile.id}@{result.profile.version}",
     }
+
+
+class OfflineAssessor(AssessorPlugin):
+    async def assess(self, context: AssessmentContext) -> AssessorResult:
+        result = await asyncio.to_thread(assess_metadata, context.metadata)
+        return AssessorResult(
+            assessor_id=self.assessor_id,
+            name=self.name,
+            status="completed",
+            version=result["assessor_version"],
+            raw=result,
+        )
+
+    def normalize(self, raw, context):
+        raise NotImplementedError("Offline results are returned, not stored.")
