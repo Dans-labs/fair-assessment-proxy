@@ -55,9 +55,10 @@ public URL is required. The proxy assesses the metadata locally with the F-UJI
 and returns the result immediately without storing it.
 
 ```bash
-curl --location 'localhost:8080/api/v1/assessments/offline' \
+curl --location 'localhost:8080/api/v1/assessments/' \
 --header 'Content-Type: application/json' \
 --data '{
+  "assessors": ["offline"],
   "metadata": {
     "@context": "https://schema.org/",
     "@type": "Dataset",
@@ -73,9 +74,10 @@ curl --location 'localhost:8080/api/v1/assessments/offline' \
 }'
 ```
 
-The response has the same fields as a stored assessment result. Cells that need
-external evidence, such as F4, A1.1, A1.2 and A2, are `indeterminate`. `raw`
-contains the complete LOAF result.
+The response's `offline` field has the same fields as a stored assessment
+result. Cells that need external evidence, such as F4, A1.1, A1.2 and A2, are
+`indeterminate`, and `raw` contains the complete LOAF result. Add a `pid` and
+online assessors to queue online assessments in the same request.
 
 ## Metadata Retrieval
 
