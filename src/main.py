@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fair_assessment_proxy.api import root, assessments, profiles, assessors
+from fair_assessment_proxy.api import root, assessments, profiles, assessors, retrieval
 from fair_assessment_proxy.config import (
     load_service_config,
     init_logging,
@@ -54,6 +54,9 @@ app.include_router(
 app.include_router(profiles.router, tags=["Profiles"], prefix=f"{API_PREFIX}/profiles")
 app.include_router(
     assessors.router, tags=["Assessors"], prefix=f"{API_PREFIX}/assessors"
+)
+app.include_router(
+    retrieval.router, tags=["Retrieval"], prefix=f"{API_PREFIX}/retrieve"
 )
 
 

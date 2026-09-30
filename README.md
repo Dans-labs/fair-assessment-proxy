@@ -77,6 +77,28 @@ The response has the same fields as a stored assessment result. Cells that need
 external evidence, such as F4, A1.1, A1.2 and A2, are `indeterminate`. `raw`
 contains the complete LOAF result.
 
+## Metadata Retrieval
+
+Retrieve a public JSON-LD or JSON document, for example to submit it to the
+offline assessment. DOIs return schema.org JSON-LD through content negotiation.
+
+```bash
+curl --location 'localhost:8080/api/v1/retrieve?url=https%3A%2F%2Fdoi.org%2F10.5281%2Fzenodo.3243836'
+```
+
+The response contains the document unchanged, with its media type and the final
+URL in `Content-Location`. Only `http` and `https` URLs on the standard ports are
+retrieved, and only when the host and every redirect resolve to public addresses.
+Documents are limited to 5 MB and 10 seconds. A rejected URL returns 400, a
+failed retrieval returns 502, and too many requests return 429 with
+`Retry-After`.
+
+Each client can make 10 requests per minute, and at most 4 retrievals run at
+once. Change these with `FAIR_PROXY_RETRIEVAL__REQUESTS_PER_MINUTE` and
+`FAIR_PROXY_RETRIEVAL__MAX_CONCURRENT`. Behind a reverse proxy, set Uvicorn's
+`FORWARDED_ALLOW_IPS` to its address so that clients are identified by their own
+address.
+
 ## Reports
 
 Get the harmonized report, including each test's explanation and any practical
