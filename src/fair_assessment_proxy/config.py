@@ -79,6 +79,8 @@ def init_logging() -> None:
         else "%(levelname)s:    %(message)s"
     )
     logging.basicConfig(level=log_level, format=log_format)
+    # LOAF also returns every finding it logs.
+    logging.getLogger("fair_offline_assessor").setLevel(logging.ERROR)
 
 
 def load_service_config() -> ServiceConfig:
