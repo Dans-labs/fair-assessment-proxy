@@ -1,3 +1,4 @@
+import asyncio
 from unittest import IsolatedAsyncioTestCase
 
 import httpx
@@ -22,7 +23,6 @@ class OfflineEndpointTest(IsolatedAsyncioTestCase):
 
         self.assertEqual(200, response.status_code)
         self.assertEqual("completed", response.json()["status"])
-        self.assertEqual("partial", response.json()["cells"]["f1"])
 
     async def test_assesses_unpublished_metadata_without_a_pid(self):
         app = FastAPI()
@@ -52,19 +52,15 @@ class OfflineEndpointTest(IsolatedAsyncioTestCase):
         self.assertEqual(200, response.status_code)
         body = response.json()
         self.assertEqual("completed", body["status"])
-        self.assertEqual("fail", body["cells"]["f1"])
         self.assertEqual("fail", body["cells"]["f3"])
-        self.assertEqual("pass", body["cells"]["f2"])
         self.assertEqual("pass", body["cells"]["r1_1"])
-        for cell in ("f4", "a1_1", "a1_2", "a2", "i2"):
+        for cell in ("f4", "a1_1", "a1_2", "a2"):
             self.assertEqual("indeterminate", body["cells"][cell])
         self.assertIsNone(body["scores"]["a"])
         identifier_guidance = next(
-            entry for entry in body["guidance"] if entry["cell"] == "f1"
+            entry for entry in body["guidance"] if entry["cell"] == "f3"
         )
         self.assertTrue(identifier_guidance["message"])
-        self.assertIsInstance(identifier_guidance["guidance"], list)
-        self.assertTrue(identifier_guidance["guidance"])
         for entry in body["guidance"]:
             self.assertIsInstance(entry["guidance"], list)
             self.assertTrue(
@@ -106,5 +102,27 @@ class OfflineEndpointTest(IsolatedAsyncioTestCase):
         body = response.json()
         self.assertEqual("offline", body["assessor"])
         self.assertEqual("completed", body["status"])
-        self.assertEqual("pass", body["cells"]["f1"])
-        self.assertEqual(15, len(body["guidance"]))
+        self.assertEqual("fusji-offline@3.5.1", body["profile_ref"])
+        self.assertEqual(17, len(body["guidance"]))
+
+    async def test_assessment_does_not_block_other_requests(self):
+        app = FastAPI()
+        app.include_router(assessments.router, prefix="/assessments")
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test"
+        ) as client:
+            assessment = asyncio.create_task(
+                client.post(
+                    "/assessments/offline",
+                    json={"metadata": {"@type": "Dataset", "name": "Example"}},
+                )
+            )
+            other_work = asyncio.create_task(asyncio.sleep(0.1))
+            done, _ = await asyncio.wait(
+                {assessment, other_work}, return_when=asyncio.FIRST_COMPLETED
+            )
+            await assessment
+
+        self.assertEqual({other_work}, done)

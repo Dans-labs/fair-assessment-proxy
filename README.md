@@ -47,9 +47,12 @@ gateway representation of the dataset metadata.
 
 ## Offline Assessment
 
-Submit JSON-LD or DataCite JSON API `data.attributes` metadata for an initial
-assessment of an unpublished dataset. No DOI or public URL is required. Checks
-run locally, and results are returned immediately without being stored.
+Submit JSON-LD metadata, or a DataCite JSON API response with its metadata in
+`data.attributes`, for an initial assessment of an unpublished dataset. No DOI or
+public URL is required. The proxy assesses the metadata locally with the F-UJI
+3.5.1 profile of the
+[Local Offline Assessor for FAIR (LOAF)](https://dans-labs.github.io/local-offline-assessor-for-fair-loaf/)
+and returns the result immediately without storing it.
 
 ```bash
 curl --location 'localhost:8080/api/v1/assessments/offline' \
@@ -70,17 +73,9 @@ curl --location 'localhost:8080/api/v1/assessments/offline' \
 }'
 ```
 
-The same assessment is available as a Python function:
-
-```python
-from fair_assessment_proxy.offline import assess_metadata
-
-result = assess_metadata(metadata)
-```
-
-The assessor checks F1, F2, F3, I1, I3, R1.1, R1.2, and R1.3 using the supplied
-metadata. F4, I2, A1.1, A1.2, and A2 remain `indeterminate` because they need external
-evidence. Missing identifiers fail F1 and F3; the other checks still run.
+The response has the same fields as a stored assessment result. Cells that need
+external evidence, such as F4, A1.1, A1.2 and A2, are `indeterminate`. `raw`
+contains the complete LOAF result.
 
 ## Reports
 

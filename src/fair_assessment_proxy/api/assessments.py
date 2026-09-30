@@ -428,7 +428,7 @@ async def create_assessment(req: AssessmentRequest):
 
 @router.post("/offline", tags=["Assessments"])
 async def create_offline_assessment(req: OfflineAssessmentRequest):
-    return assess_metadata(req.metadata)
+    return await asyncio.to_thread(assess_metadata, req.metadata)
 
 
 @router.get("/latest", tags=["Assessments"])
