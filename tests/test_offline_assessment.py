@@ -97,13 +97,13 @@ class AssessMetadataTest(TestCase):
         self.assertEqual("fusji-offline@3.5.1", result["profile_ref"])
         self.assertEqual("fusji-offline", result["raw"]["profile"]["id"])
 
-    def test_cells_follow_fuji_metrics_and_proxy_derivation(self):
+    def test_cells_follow_fuji_metrics(self):
         cells = assess_metadata(SOIL_DATASET)["cells"]
 
         self.assertEqual("pass", cells["r1_1"])
         self.assertEqual("fail", cells["f3"])
         self.assertEqual("indeterminate", cells["f4"])
-        self.assertEqual("indeterminate", cells["a1"])
+        self.assertEqual("fail", cells["a1"])
 
     def test_guidance_describes_each_fuji_metric(self):
         result = assess_metadata(SOIL_DATASET)

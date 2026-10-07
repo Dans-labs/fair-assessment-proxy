@@ -24,6 +24,8 @@ PRINCIPLE_CELLS = {
 }
 
 DERIVED = {"a1", "r1"}
+# F-UJI tests A1 and R1 directly; other assessors only test their refinements.
+MEASURES_PARENTS = {"fuji", "offline"}
 PARENTS = {
     "a1": ("a1_1", "a1_2"),
     "r1": ("r1_1", "r1_2", "r1_3"),
@@ -38,16 +40,20 @@ def outcome_value(value):
     return value if value in POINTS else "indeterminate"
 
 
+def derived_for(row):
+    return set() if row.assessor in MEASURES_PARENTS else DERIVED
+
+
 def cells_for(row):
     cells = {cell: outcome_value(getattr(row, cell)) for cell in CELLS}
 
-    for parent, refinements in PARENTS.items():
-        cells[parent] = combine([cells[cell] for cell in refinements])
+    for parent in derived_for(row):
+        cells[parent] = combine([cells[cell] for cell in PARENTS[parent]])
 
     return cells
 
 
-def scores_for(cells):
+def scores_for(cells, derived):
     scores = {}
     scored = {}
 
@@ -55,7 +61,7 @@ def scores_for(cells):
         points = [
             POINTS[cells[cell]]
             for cell in members
-            if cell not in DERIVED and cells[cell] != "indeterminate"
+            if cell not in derived and cells[cell] != "indeterminate"
         ]
         scores[principle] = round(sum(points) / len(points), 1) if points else None
         scored[principle] = len(points)
@@ -106,7 +112,8 @@ def serialize_guidance(entry):
 
 def serialize_result(row, raw=_RAW_MISSING, *, guidance=None):
     cells = cells_for(row)
-    scores, scored = scores_for(cells)
+    derived = derived_for(row)
+    scores, scored = scores_for(cells, derived)
     result = {
         "assessor": row.assessor,
         "status": "completed",
@@ -116,7 +123,7 @@ def serialize_result(row, raw=_RAW_MISSING, *, guidance=None):
         "cells": cells,
         "scores": scores,
         "scored": scored,
-        "derived": sorted(DERIVED),
+        "derived": sorted(derived),
         "unmapped": [],
         "guidance": guidance or [],
     }

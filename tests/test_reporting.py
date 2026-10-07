@@ -52,3 +52,16 @@ class ReportingTest(TestCase):
 
         self.assertEqual("pass", result["cells"]["a1"])
         self.assertEqual("partial", result["cells"]["r1"])
+
+    def test_keeps_parent_cells_that_fuji_measures(self):
+        values = dict.fromkeys(CELLS, "indeterminate")
+        values.update({"a1": "fail", "a1_1": "pass", "r1": "partial", "r1_1": "fail"})
+        row = SimpleNamespace(assessor="fuji", assessor_version="3.5.1", **values)
+
+        result = serialize_result(row)
+
+        self.assertEqual("fail", result["cells"]["a1"])
+        self.assertEqual("partial", result["cells"]["r1"])
+        self.assertEqual(50.0, result["scores"]["a"])
+        self.assertEqual(25.0, result["scores"]["r"])
+        self.assertEqual([], result["derived"])
