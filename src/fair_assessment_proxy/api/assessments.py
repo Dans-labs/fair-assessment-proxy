@@ -551,11 +551,22 @@ async def get_results(assessment_id: str):
             )
         ).scalars().all()
         raw_by_assessor = {row.assessor: row.raw for row in raw_rows}
+        grids = {row.assessor: cells_for(row) for row in rows}
 
         return {
             "id": assessment.id,
             "pid": assessment.pid,
             "status": assessment.status,
+            "cells": [
+                {
+                    "cell": cell,
+                    "consensus": combine([grid[cell] for grid in grids.values()]),
+                    "by_assessor": {
+                        assessor: grid[cell] for assessor, grid in grids.items()
+                    },
+                }
+                for cell in CELLS
+            ],
             "results": [
                 serialize_result(
                     row,
@@ -602,57 +613,6 @@ async def get_result_for_assessor(assessment_id: str, assessor: str):
             raw_payload,
             guidance=guidance_for(assessor, raw_payload),
         )
-
-
-@router.get("/{assessment_id}/report", tags=["Assessments"])
-async def get_report(assessment_id: str):
-    async with AsyncSessionLocal() as db:
-        assessment = await load_assessment(db, assessment_id)
-        rows = (
-            await db.execute(
-                select(HarmonizedAssessment).where(
-                    HarmonizedAssessment.assessment_id == assessment_id
-                )
-            )
-        ).scalars().all()
-        raw_rows = (
-            await db.execute(
-                select(RawAssessment).where(
-                    RawAssessment.assessment_id == assessment_id
-                )
-            )
-        ).scalars().all()
-
-        grids = {row.assessor: cells_for(row) for row in rows}
-        cells = []
-
-        for cell in CELLS:
-            by_assessor = {
-                assessor: grid[cell] for assessor, grid in grids.items()
-            }
-            cells.append(
-                {
-                    "cell": cell,
-                    "consensus": combine(list(by_assessor.values())),
-                    "by_assessor": by_assessor,
-                }
-            )
-
-        guidance = []
-
-        for raw_row in raw_rows:
-            guidance.extend(guidance_for(raw_row.assessor, raw_row.raw))
-
-        return {
-            "id": assessment.id,
-            "pid": assessment.pid,
-            "status": assessment.status,
-            "cells": cells,
-            "scores": {
-                row.assessor: serialize_result(row)["scores"] for row in rows
-            },
-            "guidance": guidance,
-        }
 
 
 @router.get("/{assessment_id}", tags=["Assessments"])
