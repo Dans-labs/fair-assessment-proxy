@@ -144,16 +144,27 @@ class ResultEndpointTest(IsolatedAsyncioTestCase):
         self.assertEqual("No licence found", response["guidance"][0]["message"])
         self.assertEqual([], response["guidance"][0]["guidance"])
 
-    async def test_report_contains_cells_scores_and_guidance(self):
-        session = FakeSession(self.assessment, [[self.row], [self.raw_row]])
+    async def test_results_combine_assessors_per_cell(self):
+        champion = SimpleNamespace(
+            assessor="fair_champion",
+            assessor_version="0.5.8",
+            **{**dict.fromkeys(CELLS, "pass"), "f1": "fail"},
+        )
+        session = FakeSession(self.assessment, [[self.row, champion], []])
 
         with patch.object(assessments, "AsyncSessionLocal", return_value=session):
-            response = await assessments.get_report("id")
+            response = await assessments.get_results("id")
 
-        self.assertEqual(15, len(response["cells"]))
-        self.assertEqual(100.0, response["scores"]["fuji"]["overall"])
-        self.assertEqual("fuji", response["guidance"][0]["assessor"])
-        self.assertEqual([], response["guidance"][0]["guidance"])
+        self.assertEqual(list(CELLS), [cell["cell"] for cell in response["cells"]])
+        self.assertEqual(
+            {
+                "cell": "f1",
+                "consensus": "fail",
+                "by_assessor": {"fuji": "pass", "fair_champion": "fail"},
+            },
+            response["cells"][0],
+        )
+        self.assertEqual("pass", response["cells"][1]["consensus"])
 
     async def test_missing_assessment_is_404(self):
         session = FakeSession(None, [])

@@ -101,12 +101,19 @@ once. Change these with `FAIR_PROXY_RETRIEVAL__REQUESTS_PER_MINUTE` and
 `FORWARDED_ALLOW_IPS` to its address so that clients are identified by their own
 address.
 
-## Reports
+## Results
 
-Get the harmonized report, including each test's explanation and any practical
-guidance returned by the configured FAIR Champion algorithm:
+Get the results of all assessors. `cells` holds the combined outcome of each
+FAIR principle and the outcome per assessor. `results` holds each assessor's
+scores, including each test's explanation and any practical guidance returned
+by the configured FAIR Champion algorithm:
 ```bash
-curl --location 'localhost:8080/api/v1/assessments/9268ba45-241b-47d5-8e8d-d32180eccc5b/report'
+curl --location 'localhost:8080/api/v1/assessments/9268ba45-241b-47d5-8e8d-d32180eccc5b/results'
+```
+
+Get the result of one assessor, including its raw response:
+```bash
+curl --location 'localhost:8080/api/v1/assessments/9268ba45-241b-47d5-8e8d-d32180eccc5b/results/fuji'
 ```
 
 Get latest report for a PID:
