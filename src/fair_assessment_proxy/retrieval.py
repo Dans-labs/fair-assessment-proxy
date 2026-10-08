@@ -1,5 +1,6 @@
 import asyncio
 import ipaddress
+import json
 import socket
 import time
 from collections.abc import Awaitable, Callable
@@ -72,13 +73,18 @@ async def _document(response: httpx.Response, url: httpx.URL) -> Document:
     if not response.is_success:
         raise RetrievalFailed(f"The server responded with {response.status_code}.")
     media_type = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
-    if media_type != "application/json" and not media_type.endswith("+json"):
-        raise RetrievalFailed("The URL did not return JSON-LD or JSON.")
     content = bytearray()
     async for chunk in response.aiter_bytes():
         content.extend(chunk)
         if len(content) > MAX_BYTES:
             raise RetrievalFailed("The document is larger than 5 MB.")
+    # Some hosts, such as raw.githubusercontent.com, serve JSON as text/plain.
+    if media_type != "application/json" and not media_type.endswith("+json"):
+        try:
+            json.loads(content)
+        except ValueError as exc:
+            raise RetrievalFailed("The URL did not return JSON-LD or JSON.") from exc
+        media_type = "application/json"
     return Document(content=bytes(content), media_type=media_type, url=str(url))
 
 

@@ -142,6 +142,16 @@ class RetrieveTest(IsolatedAsyncioTestCase):
         self.assertEqual("https://data.crosscite.org/10.1234%2Fx", document.url)
         self.assertEqual("data.crosscite.org", requests[1].extensions["sni_hostname"])
 
+    async def test_accepts_json_under_other_media_types(self):
+        for media_type in ("text/plain; charset=utf-8", "application/octet-stream"):
+            with self.subTest(media_type):
+                document, _ = await self.fetch(
+                    "https://example.org/",
+                    handler=responding_with(200, media_type, b'{"a": 1}'),
+                )
+
+                self.assertEqual("application/json", document.media_type)
+
     async def test_rejects_unusable_responses(self):
         for name, handler in (
             ("redirect loop", redirecting(times=20)),
@@ -149,7 +159,7 @@ class RetrieveTest(IsolatedAsyncioTestCase):
                 "status",
                 responding_with(404, "application/json", b"{}"),
             ),
-            ("type", responding_with(200, "text/html", b'"<script>alert(1)</script>"')),
+            ("not json", responding_with(200, "text/html", b"<p>Soil</p>")),
             (
                 "size",
                 responding_with(
