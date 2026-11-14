@@ -1,6 +1,6 @@
 [project]
 name = "fair-assessment-proxy"
-version = "0.0.9"
+version = "0.0.10"
 description = "A proxy service for the FAIR Assessment Tool Registry API"
 readme = "README.md"
 requires-python = ">=3.12.8"
@@ -47,5 +47,4 @@ Issues = "https://github.com/Dans-labs/fair-assessment-proxy/issues"
 "EOSC Data Commons grant" = "https://doi.org/10.3030/101188179"
 
 [tool.uv.sources]
-fair-offline-assessor = { git = "https://github.com/Dans-labs/local-offline-assessor-for-fair-loaf.git", tag= "v0.2.0"}
-# fair-offline-assessor = { git = "https://github.com/Dans-labs/local-offline-assessor-for-fair-loaf.git", branch = "feature/refactor_for_performance" }
+fair-offline-assessor = { git = "https://github.com/Dans-labs/local-offline-assessor-for-fair-loaf.git", tag= "v0.2.2"}
