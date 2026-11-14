@@ -47,4 +47,5 @@ Issues = "https://github.com/Dans-labs/fair-assessment-proxy/issues"
 "EOSC Data Commons grant" = "https://doi.org/10.3030/101188179"
 
 [tool.uv.sources]
-fair-offline-assessor = { git = "https://github.com/Dans-labs/local-offline-assessor-for-fair-loaf.git", rev = "ed8aba575d18b2435a3f4270814369161199e4a3" }
+fair-offline-assessor = { git = "https://github.com/Dans-labs/local-offline-assessor-for-fair-loaf.git", tag= "v0.2.0"}
+# fair-offline-assessor = { git = "https://github.com/Dans-labs/local-offline-assessor-for-fair-loaf.git", branch = "feature/refactor_for_performance" }

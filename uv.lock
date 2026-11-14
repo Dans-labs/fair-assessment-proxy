@@ -332,7 +332,7 @@ dependencies = [
 requires-dist = [
     { name = "cryptography", specifier = ">=46.0.5" },
     { name = "dynaconf", specifier = ">=3.2.12" },
-    { name = "fair-offline-assessor", git = "https://github.com/Dans-labs/local-offline-assessor-for-fair-loaf.git?rev=ed8aba575d18b2435a3f4270814369161199e4a3" },
+    { name = "fair-offline-assessor", git = "https://github.com/Dans-labs/local-offline-assessor-for-fair-loaf.git?tag=v0.2.0" },
     { name = "fastapi", specifier = ">=0.128.0" },
     { name = "greenlet", specifier = ">=3.3.2" },
     { name = "httpx", specifier = ">=0.28.1" },
@@ -346,8 +346,8 @@ requires-dist = [
 
 [[package]]
 name = "fair-offline-assessor"
-version = "0.1.0"
-source = { git = "https://github.com/Dans-labs/local-offline-assessor-for-fair-loaf.git?rev=ed8aba575d18b2435a3f4270814369161199e4a3#ed8aba575d18b2435a3f4270814369161199e4a3" }
+version = "0.2.0"
+source = { git = "https://github.com/Dans-labs/local-offline-assessor-for-fair-loaf.git?tag=v0.2.0#2c2fa7e161cdb43ae54f148fb2b6cd83031fa222" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "extruct" },

@@ -1,4 +1,3 @@
-import os
 import re
 from typing import Any
 
@@ -8,6 +7,7 @@ from fair_assessment_proxy.models import AssessmentMode, AssessorResult
 from fair_assessment_proxy.plugins.base import AssessmentContext, AssessorPlugin
 from fair_assessment_proxy.models import NormalizedAssessorResult, FairOutcome
 from fair_assessment_proxy.reporting import serialize_guidance
+from fair_assessment_proxy.config import load_fuji_config
 
 
 METRIC_PATTERN = re.compile(r"^FsF-([FAIR]\d(?:\.\d)?)-")
@@ -135,17 +135,14 @@ class FujiAssessor(AssessorPlugin):
                 }
             )
 
-        # username = os.getenv(self.config.get("username_env", "FUJI_USERNAME"))
-        # password = os.getenv(self.config.get("password_env", "FUJI_PASSWORD"))
-        username = os.getenv("FUJI_USERNAME")
-        password = os.getenv("FUJI_PASSWORD")
+        username = load_fuji_config().username
+        password = load_fuji_config().password
 
         if not username or not password:
             raise RuntimeError("Missing FUJI basic-auth credentials")
 
-        # print(f"[DEBUG] username: {username}, password: {'*' * len(password)}")
-
         async with httpx.AsyncClient(timeout=180.0) as client:
+            # print(f"[DEBUG] username: {username}, password: {'*' * len(password)}")
             response = await client.post(
                 url,
                 json=payload,

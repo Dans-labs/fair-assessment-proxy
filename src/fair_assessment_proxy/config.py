@@ -23,6 +23,12 @@ class DatabaseConfig:
 
 
 @dataclass(frozen=True)
+class UserCredentials:
+    username: str
+    password: str
+
+
+@dataclass(frozen=True)
 class ServiceConfig:
     admin_auth_key: str
     name: str = "Fair Assessment Proxy"
@@ -34,6 +40,14 @@ class ServiceConfig:
 
 class AssessorConfigError(Exception):
     pass
+
+
+def load_fuji_config() -> UserCredentials:
+    creds = settings.fuji
+    return UserCredentials(
+        username=creds.username,
+        password=creds.password,
+    )
 
 
 def load_assessor_config(path: str = "config/assessors.yaml") -> dict[str, Any]:

@@ -22,3 +22,7 @@ egi_env = "development" # Set to "production" or "development" or "demo"
 [retrieval]
 requests_per_minute = 10
 max_concurrent = 4
+
+[fuji]
+username="username"
+password="password"

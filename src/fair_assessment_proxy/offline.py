@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from types import SimpleNamespace
 from typing import Any
 
-from fair_offline_assessor import Assessor
+from fair_offline_assessor import FairAssessor
 from fair_offline_assessor.models import AssessmentResult, MetricResult
 
 from fair_assessment_proxy.models import AssessorResult
@@ -15,7 +15,7 @@ from fair_assessment_proxy.reporting import (
     serialize_result,
 )
 
-FUJI_VERSION = "3.5.1"
+# FUJI_VERSION = "3.5.1"
 
 
 def _outcome(earned: float, maximum: float) -> str:
@@ -85,7 +85,8 @@ def _fuji_input(metadata: dict[str, Any]) -> dict[str, Any]:
 
 def assess_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     """Assess FAIR characteristics that can be observed without network access."""
-    result = Assessor("FUJI", version=FUJI_VERSION).assess(**_fuji_input(metadata))
+    # result = Assessor("FUJI", version=FUJI_VERSION).assess(**_fuji_input(metadata))
+    result = FairAssessor().assess(**_fuji_input(metadata))
     row = SimpleNamespace(
         assessor="offline",
         assessor_version=result.profile.version,
