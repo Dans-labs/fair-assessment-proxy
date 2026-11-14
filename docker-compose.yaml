@@ -9,8 +9,10 @@ services:
       FUJI_BASE_URL: "http://fuji:1071/fuji/api/v1"
 
       # Basic auth used by the proxy when calling F-UJI
-      FUJI_USERNAME: ${FUJI_USERNAME}
-      FUJI_PASSWORD: ${FUJI_PASSWORD}
+      # FUJI_USERNAME: ${FUJI_USERNAME}
+      # FUJI_PASSWORD: ${FUJI_PASSWORD}
+      FAIR_PROXY_FUJI__USERNAME: "${FAIR_PROXY_FUJI__USERNAME}"
+      FAIR_PROXY_FUJI__PASSWORD: "${FAIR_PROXY_FUJI__PASSWORD}"
 
       # FAIR Champion / FAIR Core Tests
       CHAMPION_BASE_URL: "http://fair-champion:4567/champion"
@@ -75,8 +77,8 @@ services:
       - ./fuji-config/users.py:/usr/src/app/fuji_server/config/users.py:ro
     environment:
       ENABLE_CORS: "true"
-      FUJI_USERNAME: "${FUJI_USERNAME}"
-      FUJI_PASSWORD: "${FUJI_PASSWORD}"
+      FUJI_USERNAME: "${FAIR_PROXY_FUJI__USERNAME}"
+      FUJI_PASSWORD: "${FAIR_PROXY_FUJI__PASSWORD}"
     networks:
       - fair-net
 

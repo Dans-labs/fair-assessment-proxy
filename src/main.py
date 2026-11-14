@@ -24,8 +24,8 @@ API_PREFIX = service_config.api_prefix
 VERSION = get_app_version()
 logger.info("Starting FAIR assessment proxy")
 security.init_nonce_db()
-ADMIN_TOKEN = security.generate_admin_token(service_config.admin_auth_key)
-logger.info(f"Admin token: {ADMIN_TOKEN}")
+# ADMIN_TOKEN = security.generate_admin_token(service_config.admin_auth_key)
+# logger.info(f"Admin token: {ADMIN_TOKEN}")
 PLUGINS = load_assessor_plugins()
 ASSESSMENTS: dict[str, dict[str, Any]] = {}
 
